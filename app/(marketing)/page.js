@@ -1,6 +1,5 @@
 // app/(marketing)/page.jsx
 import HeroSection from './components/home/HeroSection';
-import LiveStatsBar from './components/home/LiveStatsBar';
 import HowItWorks from './components/home/HowItWorks';
 import LevelsShowcase from './components/home/LevelsShowcase';
 import ReferralProgram from './components/home/ReferralProgram';
@@ -11,7 +10,6 @@ export default function HomePage() {
   return (
     <>
       <HeroSection />
-      <LiveStatsBar />
       <HowItWorks />
       <LevelsShowcase />
       <ReferralProgram />

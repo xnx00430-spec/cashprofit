@@ -267,7 +267,7 @@ function RegisterOnboardingPageInner() {
           </div>
           
           <div className="relative z-10">
-            <div className="text-4xl font-bold text-white mb-2">INVEST</div>
+            <div className="text-3xl font-black tracking-tight text-white mb-2">Cash<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">Profit</span></div>
             <div className="text-white/90 text-lg">Votre avenir financier commence ici</div>
           </div>
 

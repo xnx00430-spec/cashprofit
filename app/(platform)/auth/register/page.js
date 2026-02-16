@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Phone, Mail, Globe, CheckCircle2, ChevronRight, TrendingUp, Shield, Users, Zap, Check, ArrowRight, Lock, BarChart3, Clock, Award, Loader2 } from 'lucide-react';
 
-export default function RegisterOnboardingPage() {
+function RegisterOnboardingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -22,7 +22,7 @@ export default function RegisterOnboardingPage() {
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
-    phone: '', // Toujours obligatoire
+    phone: '',
     password: '',
     confirmPassword: '',
     country: 'CI',
@@ -57,7 +57,6 @@ export default function RegisterOnboardingPage() {
   }, [phase]);
 
   const countries = [
-    // Afrique de l'Ouest (FCFA & autres)
     { code: 'CI', name: 'Côte d\'Ivoire', flag: '🇨🇮', prefix: '+225' },
     { code: 'SN', name: 'Sénégal', flag: '🇸🇳', prefix: '+221' },
     { code: 'BF', name: 'Burkina Faso', flag: '🇧🇫', prefix: '+226' },
@@ -66,21 +65,17 @@ export default function RegisterOnboardingPage() {
     { code: 'NG', name: 'Nigeria', flag: '🇳🇬', prefix: '+234' },
     { code: 'SL', name: 'Sierra Leone', flag: '🇸🇱', prefix: '+232' },
     { code: 'TG', name: 'Togo', flag: '🇹🇬', prefix: '+228' },
-    // Afrique Centrale
     { code: 'CM', name: 'Cameroun', flag: '🇨🇲', prefix: '+237' },
     { code: 'CG', name: 'Congo', flag: '🇨🇬', prefix: '+242' },
     { code: 'CD', name: 'RD Congo', flag: '🇨🇩', prefix: '+243' },
     { code: 'GA', name: 'Gabon', flag: '🇬🇦', prefix: '+241' },
-    // Afrique de l'Est
     { code: 'KE', name: 'Kenya', flag: '🇰🇪', prefix: '+254' },
     { code: 'TZ', name: 'Tanzanie', flag: '🇹🇿', prefix: '+255' },
     { code: 'UG', name: 'Ouganda', flag: '🇺🇬', prefix: '+256' },
     { code: 'RW', name: 'Rwanda', flag: '🇷🇼', prefix: '+250' },
-    // Afrique Australe & Sud-Est
     { code: 'MZ', name: 'Mozambique', flag: '🇲🇿', prefix: '+258' },
     { code: 'MW', name: 'Malawi', flag: '🇲🇼', prefix: '+265' },
     { code: 'ZM', name: 'Zambie', flag: '🇿🇲', prefix: '+260' },
-    // Mali (non officiel PawaPay mais zone FCFA, à retirer si besoin)
     { code: 'ML', name: 'Mali', flag: '🇲🇱', prefix: '+223' },
   ];
 
@@ -145,17 +140,13 @@ export default function RegisterOnboardingPage() {
 
   const formatNumber = (num) => new Intl.NumberFormat('fr-FR').format(num);
 
-  // Valider le numéro de téléphone
   const validatePhone = (phone) => {
     const cleaned = phone.replace(/[\s\-\(\)]/g, '');
-    // Doit contenir au moins 8 chiffres (avec ou sans indicatif)
     return /^\+?\d{8,15}$/.test(cleaned);
   };
 
-  // Formater le numéro pour l'API
   const formatPhoneForAPI = (phone) => {
     let cleaned = phone.replace(/[\s\-\(\)]/g, '');
-    // Si pas d'indicatif, ajouter celui du pays
     if (!cleaned.startsWith('+')) {
       const country = countries.find(c => c.code === formData.country);
       const prefix = country?.prefix || '+225';
@@ -173,14 +164,12 @@ export default function RegisterOnboardingPage() {
       return;
     }
 
-    // Valider le numéro de téléphone (toujours obligatoire)
     const phoneNumber = loginMethod === 'phone' ? formData.contact : formData.phone;
     if (!phoneNumber || !validatePhone(phoneNumber)) {
       setError('Veuillez entrer un numéro de téléphone valide (ex: 0700000000)');
       return;
     }
 
-    // Valider l'email si inscription par email
     if (loginMethod === 'email' && !formData.contact.includes('@')) {
       setError('Veuillez entrer une adresse email valide');
       return;
@@ -236,7 +225,6 @@ export default function RegisterOnboardingPage() {
     }
   };
 
-  // Auto-play slides
   React.useEffect(() => {
     if (phase === 'setup1' && !isPaused) {
       const timer = setInterval(() => {
@@ -269,11 +257,9 @@ export default function RegisterOnboardingPage() {
   const handleSetup1Next = () => { currentSlide < slides.length - 1 ? setCurrentSlide(prev => prev + 1) : setPhase('setup2'); };
   const handleSkipSetup1 = () => setPhase('setup2');
 
-  // ====== PHASE 1: INSCRIPTION ======
   if (phase === 'register') {
     return (
       <div className="min-h-screen flex">
-        {/* Left Side - Branding */}
         <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-black via-gray-900 to-black p-12 flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 opacity-5">
             <div className="absolute top-20 left-20 w-64 h-64 bg-yellow-400 rounded-full blur-3xl"></div>
@@ -312,13 +298,12 @@ export default function RegisterOnboardingPage() {
           </div>
         </div>
 
-        {/* Right Side - Form */}
         <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
           <div className="w-full max-w-md">
             <div className="bg-white rounded-2xl shadow-xl p-8">
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Créer un compte</h1>
-                <p className="text-gray-600">Rejoignez notre communauté d'investisseurs</p>
+                <p className="text-gray-600">Rejoignez notre communauté d&apos;investisseurs</p>
               </div>
 
               {error && (
@@ -328,119 +313,80 @@ export default function RegisterOnboardingPage() {
               )}
 
               <form onSubmit={handleRegisterSubmit} className="space-y-5">
-                {/* Nom complet */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
-                  <input
-                    type="text"
-                    value={formData.name}
+                  <input type="text" value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Votre nom complet"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
-                    required
-                    disabled={isLoading}
-                  />
+                    required disabled={isLoading} />
                 </div>
 
-                {/* Numéro de téléphone - TOUJOURS OBLIGATOIRE */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Phone className="w-4 h-4 inline mr-1" />
                     Numéro de téléphone * <span className="text-gray-400 text-xs">(requis pour les paiements)</span>
                   </label>
                   <div className="flex gap-2">
-                    <select
-                      value={formData.country}
+                    <select value={formData.country}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                       className="w-28 px-2 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white text-sm"
-                      disabled={isLoading}
-                    >
+                      disabled={isLoading}>
                       {countries.map(country => (
-                        <option key={country.code} value={country.code}>
-                          {country.flag} {country.prefix}
-                        </option>
+                        <option key={country.code} value={country.code}>{country.flag} {country.prefix}</option>
                       ))}
                     </select>
-                    <input
-                      type="tel"
+                    <input type="tel"
                       value={loginMethod === 'phone' ? formData.contact : formData.phone}
                       onChange={(e) => {
-                        if (loginMethod === 'phone') {
-                          setFormData({ ...formData, contact: e.target.value });
-                        } else {
-                          setFormData({ ...formData, phone: e.target.value });
-                        }
+                        if (loginMethod === 'phone') setFormData({ ...formData, contact: e.target.value });
+                        else setFormData({ ...formData, phone: e.target.value });
                       }}
                       placeholder="07 00 00 00 00"
                       className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
-                      required
-                      disabled={isLoading}
-                    />
+                      required disabled={isLoading} />
                   </div>
                 </div>
 
-                {/* Toggle Phone/Email pour connexion */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Méthode de connexion</label>
                   <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setLoginMethod('phone')}
-                      disabled={isLoading}
-                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2 text-sm ${
-                        loginMethod === 'phone' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
+                    <button type="button" onClick={() => setLoginMethod('phone')} disabled={isLoading}
+                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2 text-sm ${loginMethod === 'phone' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                       <Phone className="w-4 h-4" /> Téléphone
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setLoginMethod('email')}
-                      disabled={isLoading}
-                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2 text-sm ${
-                        loginMethod === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
+                    <button type="button" onClick={() => setLoginMethod('email')} disabled={isLoading}
+                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2 text-sm ${loginMethod === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                       <Mail className="w-4 h-4" /> Email
                     </button>
                   </div>
                 </div>
 
-                {/* Email (seulement si méthode email) */}
                 {loginMethod === 'email' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Adresse email *</label>
-                    <input
-                      type="email"
-                      value={formData.contact}
+                    <input type="email" value={formData.contact}
                       onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
                       placeholder="votre@email.com"
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
-                      required
-                      disabled={isLoading}
-                    />
+                      required disabled={isLoading} />
                   </div>
                 )}
 
-                {/* Info - connexion par téléphone */}
                 {loginMethod === 'phone' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                     <div className="text-blue-600 text-xs">ℹ️ Vous utiliserez votre numéro de téléphone pour vous connecter</div>
                   </div>
                 )}
 
-                {/* Password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe *</label>
                   <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
+                    <input type={showPassword ? 'text' : 'password'} value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       placeholder="••••••••"
                       className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
-                      required disabled={isLoading} minLength={6}
-                    />
+                      required disabled={isLoading} minLength={6} />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" disabled={isLoading}>
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -448,18 +394,14 @@ export default function RegisterOnboardingPage() {
                   </div>
                 </div>
 
-                {/* Confirm Password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe *</label>
                   <div className="relative">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={formData.confirmPassword}
+                    <input type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                       placeholder="••••••••"
                       className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
-                      required disabled={isLoading}
-                    />
+                      required disabled={isLoading} />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" disabled={isLoading}>
                       {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -467,41 +409,30 @@ export default function RegisterOnboardingPage() {
                   </div>
                 </div>
 
-                {/* Code parrain */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Code parrain (optionnel)</label>
-                  <input
-                    type="text"
-                    value={formData.referralCode}
+                  <input type="text" value={formData.referralCode}
                     onChange={(e) => setFormData({ ...formData, referralCode: e.target.value.toUpperCase() })}
                     placeholder="CODE123"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white uppercase"
-                    disabled={isLoading}
-                  />
+                    disabled={isLoading} />
                 </div>
 
-                {/* Terms */}
                 <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox" id="terms"
-                    checked={formData.acceptTerms}
+                  <input type="checkbox" id="terms" checked={formData.acceptTerms}
                     onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
                     className="w-5 h-5 mt-0.5 border-gray-300 rounded text-yellow-500 focus:ring-yellow-400"
-                    required disabled={isLoading}
-                  />
+                    required disabled={isLoading} />
                   <label htmlFor="terms" className="text-sm text-gray-600">
-                    J'accepte les{' '}
-                    <a href="/terms" className="text-yellow-500 hover:text-yellow-600 font-medium">conditions d'utilisation</a>
+                    J&apos;accepte les{' '}
+                    <a href="/legal/terms" className="text-yellow-500 hover:text-yellow-600 font-medium">conditions d&apos;utilisation</a>
                     {' '}et la{' '}
-                    <a href="/privacy" className="text-yellow-500 hover:text-yellow-600 font-medium">politique de confidentialité</a>
+                    <a href="/legal/privacy" className="text-yellow-500 hover:text-yellow-600 font-medium">politique de confidentialité</a>
                   </label>
                 </div>
 
-                {/* Submit */}
-                <button
-                  type="submit" disabled={isLoading}
-                  className="w-full bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none flex items-center justify-center gap-2"
-                >
+                <button type="submit" disabled={isLoading}
+                  className="w-full bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none flex items-center justify-center gap-2">
                   {isLoading ? (
                     <><Loader2 className="w-5 h-5 animate-spin" /> Inscription en cours...</>
                   ) : (
@@ -521,7 +452,6 @@ export default function RegisterOnboardingPage() {
     );
   }
 
-  // ====== PHASE 2: SLIDES ONBOARDING ======
   if (phase === 'setup1') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -593,7 +523,6 @@ export default function RegisterOnboardingPage() {
     );
   }
 
-  // ====== PHASE 3: DÉCOUVRIR LES OPPORTUNITÉS ======
   if (phase === 'setup2') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4"
@@ -692,4 +621,12 @@ export default function RegisterOnboardingPage() {
   }
 
   return null;
+}
+
+export default function RegisterOnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="text-gray-900">Chargement...</div></div>}>
+      <RegisterOnboardingPageInner />
+    </Suspense>
+  );
 }

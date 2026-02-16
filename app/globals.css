@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optionnel : Ajoute un fond noir par défaut pour ressembler à ton design */
+body {
+  background-color: #000;
+  color: #fff;
+}

@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-earnings",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/update-opportunities",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/check-deadlines",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

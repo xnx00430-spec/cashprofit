@@ -7,29 +7,29 @@ export default function SecuritySection() {
   const guarantees = [
     {
       icon: Shield,
-      title: 'Capital protégé',
-      description: 'Votre capital est garanti par un fonds de réserve. En cas de baisse du marché, votre investissement est couvert à 100%.',
+      title: 'Votre argent est protégé',
+      description: 'Votre investissement est sécurisé par un fonds de réserve. Même si le marché bouge, votre capital reste intact. Vous ne perdez jamais ce que vous avez investi.',
       color: 'bg-green-50 border-green-200',
       iconColor: 'text-green-600'
     },
     {
       icon: Lock,
-      title: 'Données sécurisées',
-      description: 'Vos informations personnelles et financières sont protégées par un chiffrement de niveau bancaire.',
+      title: 'Vos données restent privées',
+      description: 'Toutes vos informations personnelles, votre numéro de téléphone et vos données financières sont chiffrées. Personne ne peut y accéder à part vous.',
       color: 'bg-blue-50 border-blue-200',
       iconColor: 'text-blue-600'
     },
     {
       icon: Eye,
-      title: 'Transparence totale',
-      description: 'Suivez vos bénéfices en temps réel. Chaque centime est traçable sur votre tableau de bord.',
+      title: 'Tout est transparent',
+      description: 'Vous voyez vos gains en temps réel sur votre tableau de bord. Chaque franc gagné est visible. Pas de surprises, pas de frais cachés.',
       color: 'bg-yellow-50 border-yellow-200',
       iconColor: 'text-yellow-600'
     },
     {
       icon: RefreshCw,
-      title: 'Retrait garanti',
-      description: 'Retirez vos bénéfices à tout moment. Transfert sous 24 à 48 heures sur votre Mobile Money.',
+      title: 'Retirez quand vous voulez',
+      description: 'Vos bénéfices vous appartiennent. Demandez un retrait à tout moment et recevez votre argent sur votre Mobile Money en moins de 24 heures.',
       color: 'bg-purple-50 border-purple-200',
       iconColor: 'text-purple-600'
     }
@@ -43,13 +43,13 @@ export default function SecuritySection() {
         <div className="text-center mb-20">
           <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 mb-6">
             <Shield size={14} className="text-green-600" />
-            <span className="text-green-700 text-sm font-medium">Sécurité & confiance</span>
+            <span className="text-green-700 text-sm font-medium">Sécurité et confiance</span>
           </div>
           <h2 className="text-4xl lg:text-5xl font-black text-gray-900 mb-6 tracking-tight">
-            Investissez l'esprit <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-600">tranquille</span>
+            Investissez l&apos;esprit <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-600">tranquille</span>
           </h2>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Votre sécurité est notre priorité absolue. Nous mettons tout en œuvre pour protéger votre investissement.
+            Nous savons que confier son argent demande de la confiance. C&apos;est pourquoi nous faisons tout pour que votre investissement soit en sécurité.
           </p>
         </div>
 
@@ -75,17 +75,26 @@ export default function SecuritySection() {
           <div className="flex flex-col md:flex-row items-center justify-center gap-8">
             <div className="flex items-center gap-3">
               <CheckCircle className="text-green-600" size={24} />
-              <span className="text-gray-900 font-semibold">Risque 0% garanti</span>
+              <div>
+                <span className="text-gray-900 font-semibold block">Capital garanti</span>
+                <span className="text-gray-500 text-xs">Vous ne perdez jamais votre investissement</span>
+              </div>
             </div>
-            <div className="hidden md:block w-px h-8 bg-gray-200" />
+            <div className="hidden md:block w-px h-12 bg-gray-200" />
             <div className="flex items-center gap-3">
               <CheckCircle className="text-green-600" size={24} />
-              <span className="text-gray-900 font-semibold">Experts certifiés</span>
+              <div>
+                <span className="text-gray-900 font-semibold block">Retrait sous 24h</span>
+                <span className="text-gray-500 text-xs">Directement sur votre Mobile Money</span>
+              </div>
             </div>
-            <div className="hidden md:block w-px h-8 bg-gray-200" />
+            <div className="hidden md:block w-px h-12 bg-gray-200" />
             <div className="flex items-center gap-3">
               <CheckCircle className="text-green-600" size={24} />
-              <span className="text-gray-900 font-semibold">Support 7j/7</span>
+              <div>
+                <span className="text-gray-900 font-semibold block">Support 7j/7</span>
+                <span className="text-gray-500 text-xs">On est là pour vous aider</span>
+              </div>
             </div>
           </div>
         </div>

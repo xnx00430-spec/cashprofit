@@ -467,8 +467,8 @@ export default function ReseauPage() {
                   </div>
 
                   {subNetwork.map((subRef, index) => {
-                    const filleulCommission = (subRef.totalEarnings || 0) * 0.10;
-                    const yourIndirectGain = filleulCommission * 0.10;
+                    const affiliéCommission = (subRef.totalEarnings || 0) * 0.10;
+                    const yourIndirectGain = affiliéCommission * 0.10;
 
                     return (
                       <div key={subRef._id || index} className="bg-white/70 backdrop-blur-xl border border-gray-200 rounded-2xl p-4 shadow-sm">
@@ -504,7 +504,7 @@ export default function ReseauPage() {
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                             <div className="text-blue-600 text-xs mb-1">→ {selectedReferral.name || selectedReferral.firstName}</div>
                             <div className="text-blue-600 text-sm font-bold">
-                              {filleulCommission.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F
+                              {affiliéCommission.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F
                             </div>
                           </div>
                           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">

@@ -159,7 +159,7 @@ export default function UserLayout({ children }) {
     { id: 'marche', label: 'Marché', icon: TrendingUp, href: '/user', description: 'Aperçu global' },
     { id: 'portefeuille', label: 'Portefeuille', icon: Wallet, href: '/user/portefeuille', description: 'Soldes & retraits' },
     { id: 'investir', label: 'Investir', icon: Rocket, href: '/user/investir', isMain: true, description: 'Opportunités' },
-    { id: 'reseau', label: 'Réseau', icon: Users, href: '/user/reseau', description: 'Filleuls & gains' },
+    { id: 'reseau', label: 'Réseau', icon: Users, href: '/user/reseau', description: 'Affiliés & gains' },
     { id: 'profil', label: 'Profil', icon: User, href: '/user/profil', description: 'Paramètres' },
   ];
 
@@ -408,7 +408,7 @@ export default function UserLayout({ children }) {
 
       {/* BOUTON WHATSAPP SUPPORT */}
       <a
-        href="https://wa.me/47XXXXXXXXXXXX?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20sur%20CashProfit"
+        href="https://wa.me/447352885995?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20sur%20CashProfit"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 bg-green-500 hover:bg-green-600 text-white p-3.5 rounded-full shadow-lg shadow-green-500/30 transition-all hover:scale-105"

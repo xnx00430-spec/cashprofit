@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           <p className="text-gray-600 leading-relaxed"><strong>2.2. Données financières :</strong> montants investis, historique des transactions, bénéfices générés, historique des retraits, méthode de paiement (Mobile Money), numéro de compte de paiement.</p>
           <p className="text-gray-600 leading-relaxed"><strong>2.3. Données de vérification (KYC) :</strong> copie de la pièce d'identité (recto/verso), photo selfie pour vérification d'identité, justificatif de domicile le cas échéant.</p>
           <p className="text-gray-600 leading-relaxed"><strong>2.4. Données de connexion et d'utilisation :</strong> adresse IP, type de navigateur et d'appareil, pages consultées, durée des sessions, date et heure de connexion, actions effectuées sur la Plateforme.</p>
-          <p className="text-gray-600 leading-relaxed"><strong>2.5. Données de parrainage :</strong> code de parrainage, identité du Parrain et des Filleuls, commissions et bonus générés via le programme de parrainage.</p>
+          <p className="text-gray-600 leading-relaxed"><strong>2.5. Données de parrainage :</strong> code de parrainage, identité du Parrain et des Affiliés, commissions et bonus générés via le programme de parrainage.</p>
 
           <h2 className="text-2xl font-bold text-gray-900 mt-10 mb-4">3. Finalités du traitement</h2>
           <p className="text-gray-600 leading-relaxed">Vos données personnelles sont collectées et traitées pour les finalités suivantes :</p>

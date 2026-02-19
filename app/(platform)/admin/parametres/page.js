@@ -181,7 +181,7 @@ export default function AdminSettings() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-black/40 border border-yellow-400/20 rounded-xl p-4">
-                <label className="text-white/60 text-sm mb-2 block">Filleuls Directs (Niveau 1)</label>
+                <label className="text-white/60 text-sm mb-2 block">Affiliés Directs (Niveau 1)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"

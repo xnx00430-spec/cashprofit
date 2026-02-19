@@ -18,10 +18,9 @@ function RegisterOnboardingPageInner() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loginMethod, setLoginMethod] = useState('phone');
   const [formData, setFormData] = useState({
     name: '',
-    contact: '',
+    email: '',
     phone: '',
     password: '',
     confirmPassword: '',
@@ -81,8 +80,7 @@ function RegisterOnboardingPageInner() {
 
   const slides = [
     {
-      icon: TrendingUp,
-      color: 'from-black via-gray-900 to-black',
+      icon: TrendingUp, color: 'from-black via-gray-900 to-black',
       title: 'Rendements Exceptionnels',
       subtitle: 'Gagne jusqu\'à 20% par semaine sur ton investissement, capital initial sécurisé et retirable à tout moment dès le niveau 2.',
       stats: [
@@ -94,10 +92,8 @@ function RegisterOnboardingPageInner() {
       highlight: '2 Milliards FCFA déjà versés'
     },
     {
-      icon: Shield,
-      color: 'from-black via-gray-900 to-black',
-      title: 'Sécurité Maximale',
-      subtitle: 'Votre capital est notre priorité',
+      icon: Shield, color: 'from-black via-gray-900 to-black',
+      title: 'Sécurité Maximale', subtitle: 'Votre capital est notre priorité',
       features: [
         { icon: Lock, text: 'Fonds 100% sécurisés et assurés' },
         { icon: Award, text: 'Licence réglementaire officielle' },
@@ -108,23 +104,19 @@ function RegisterOnboardingPageInner() {
       highlight: 'Aucune perte enregistrée depuis 1 an'
     },
     {
-      icon: Users,
-      color: 'from-black via-gray-900 to-black',
-      title: 'Revenus Passifs',
-      subtitle: 'Gagnez sur votre réseau',
+      icon: Users, color: 'from-black via-gray-900 to-black',
+      title: 'Revenus Passifs', subtitle: 'Gagnez sur votre réseau',
       features: [
         { icon: TrendingUp, text: 'Niveau 1 : 10% par semaine sur investissement' },
-        { icon: Users, text: 'Niveau 2 : 15% + 10% gains filleuls directs' },
+        { icon: Users, text: 'Niveau 2 : 15% + 10% gains affiliés directs' },
         { icon: Award, text: 'Niveau 3 : 20% + commissions multi-niveaux' }
       ],
       description: 'Plus vous développez votre réseau, plus vos revenus explosent.',
       highlight: 'Revenus passifs + commissions réseau'
     },
     {
-      icon: Zap,
-      color: 'from-black via-gray-900 to-black',
-      title: 'Démarrage Instantané',
-      subtitle: 'Investissez en moins de 5 minutes',
+      icon: Zap, color: 'from-black via-gray-900 to-black',
+      title: 'Démarrage Instantané', subtitle: 'Investissez en moins de 5 minutes',
       steps: [
         { icon: Check, text: 'Inscription ultra-rapide', time: '30 sec' },
         { icon: Check, text: 'Premier investissement', time: '2 min' },
@@ -137,7 +129,6 @@ function RegisterOnboardingPageInner() {
   ];
 
   const currentSlideData = slides[currentSlide];
-
   const formatNumber = (num) => new Intl.NumberFormat('fr-FR').format(num);
 
   const validatePhone = (phone) => {
@@ -159,66 +150,32 @@ function RegisterOnboardingPageInner() {
     e.preventDefault();
     setError(null);
 
-    if (!formData.name.trim()) {
-      setError('Le nom est requis');
-      return;
-    }
-
-    const phoneNumber = loginMethod === 'phone' ? formData.contact : formData.phone;
-    if (!phoneNumber || !validatePhone(phoneNumber)) {
-      setError('Veuillez entrer un numéro de téléphone valide (ex: 0700000000)');
-      return;
-    }
-
-    if (loginMethod === 'email' && !formData.contact.includes('@')) {
-      setError('Veuillez entrer une adresse email valide');
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
-      return;
-    }
-
-    if (!formData.acceptTerms) {
-      setError('Veuillez accepter les conditions');
-      return;
-    }
+    if (!formData.name.trim()) { setError('Le nom est requis'); return; }
+    if (!formData.email || !formData.email.includes('@')) { setError('Veuillez entrer une adresse email valide'); return; }
+    if (!formData.phone || !validatePhone(formData.phone)) { setError('Veuillez entrer un numéro de téléphone valide'); return; }
+    if (formData.password !== formData.confirmPassword) { setError('Les mots de passe ne correspondent pas'); return; }
+    if (formData.password.length < 6) { setError('Le mot de passe doit contenir au moins 6 caractères'); return; }
+    if (!formData.acceptTerms) { setError('Veuillez accepter les conditions'); return; }
 
     setIsLoading(true);
-
     try {
-      const formattedPhone = formatPhoneForAPI(phoneNumber);
-
+      const formattedPhone = formatPhoneForAPI(formData.phone);
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name.trim(),
-          email: loginMethod === 'email' ? formData.contact : `${formattedPhone.replace(/\+/g, '')}@invest.com`,
+          email: formData.email.trim().toLowerCase(),
           phone: formattedPhone,
           password: formData.password,
           address: countries.find(c => c.code === formData.country)?.name || '',
           referralCode: formData.referralCode.trim() || null
         }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erreur lors de l\'inscription');
-      }
-
-      console.log('Inscription réussie:', data);
+      if (!response.ok) throw new Error(data.message || 'Erreur lors de l\'inscription');
       window.location.href = '/user';
-
     } catch (err) {
-      console.error('Erreur inscription:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -244,33 +201,31 @@ function RegisterOnboardingPageInner() {
     }
     setDragStart(null); setIsPaused(false);
   };
-
   const handleTap = (e) => {
     const { clientX, currentTarget } = e;
     const { width } = currentTarget.getBoundingClientRect();
     if (clientX < width / 3 && currentSlide > 0) setCurrentSlide(prev => prev - 1);
     else if (clientX > (width * 2) / 3 && currentSlide < slides.length - 1) setCurrentSlide(prev => prev + 1);
   };
-
   const handleMouseDown = () => setIsPaused(true);
   const handleMouseUp = () => setIsPaused(false);
   const handleSetup1Next = () => { currentSlide < slides.length - 1 ? setCurrentSlide(prev => prev + 1) : setPhase('setup2'); };
   const handleSkipSetup1 = () => setPhase('setup2');
 
+  // ==================== PHASE: REGISTER ====================
   if (phase === 'register') {
     return (
       <div className="min-h-screen flex">
+        {/* Left panel desktop */}
         <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-black via-gray-900 to-black p-12 flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 opacity-5">
             <div className="absolute top-20 left-20 w-64 h-64 bg-yellow-400 rounded-full blur-3xl"></div>
             <div className="absolute bottom-20 right-20 w-96 h-96 bg-yellow-500 rounded-full blur-3xl"></div>
           </div>
-          
           <div className="relative z-10">
             <div className="text-3xl font-black tracking-tight text-white mb-2">Cash<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">Profit</span></div>
             <div className="text-white/90 text-lg">Votre avenir financier commence ici</div>
           </div>
-
           <div className="relative z-10 space-y-8">
             {[
               { title: 'Rendements garantis', desc: 'Jusqu\'à 20% de rendement par semaine sur vos investissements' },
@@ -290,7 +245,6 @@ function RegisterOnboardingPageInner() {
               </div>
             ))}
           </div>
-
           <div className="relative z-10 flex items-center gap-8 text-white/80">
             <div><div className="text-2xl font-bold text-white">26K+</div><div className="text-sm">Investisseurs</div></div>
             <div><div className="text-2xl font-bold text-white">2Mrd+</div><div className="text-sm">FCFA versés</div></div>
@@ -298,6 +252,7 @@ function RegisterOnboardingPageInner() {
           </div>
         </div>
 
+        {/* Form */}
         <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
           <div className="w-full max-w-md">
             <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -307,12 +262,11 @@ function RegisterOnboardingPageInner() {
               </div>
 
               {error && (
-                <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                  {error}
-                </div>
+                <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">{error}</div>
               )}
 
               <form onSubmit={handleRegisterSubmit} className="space-y-5">
+                {/* Nom */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
                   <input type="text" value={formData.name}
@@ -322,10 +276,23 @@ function RegisterOnboardingPageInner() {
                     required disabled={isLoading} />
                 </div>
 
+                {/* Email - TOUJOURS OBLIGATOIRE */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Phone className="w-4 h-4 inline mr-1" />
-                    Numéro de téléphone * <span className="text-gray-400 text-xs">(requis pour les paiements)</span>
+                    <Mail className="w-4 h-4 inline mr-1" /> Adresse email *
+                  </label>
+                  <input type="email" value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="votre@email.com"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
+                    required disabled={isLoading} />
+                  <p className="text-gray-400 text-[10px] mt-1">Pour recevoir les confirmations de vos investissements et retraits</p>
+                </div>
+
+                {/* Téléphone - TOUJOURS OBLIGATOIRE */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Phone className="w-4 h-4 inline mr-1" /> Numéro de téléphone *
                   </label>
                   <div className="flex gap-2">
                     <select value={formData.country}
@@ -336,49 +303,21 @@ function RegisterOnboardingPageInner() {
                         <option key={country.code} value={country.code}>{country.flag} {country.prefix}</option>
                       ))}
                     </select>
-                    <input type="tel"
-                      value={loginMethod === 'phone' ? formData.contact : formData.phone}
-                      onChange={(e) => {
-                        if (loginMethod === 'phone') setFormData({ ...formData, contact: e.target.value });
-                        else setFormData({ ...formData, phone: e.target.value });
-                      }}
+                    <input type="tel" value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="07 00 00 00 00"
                       className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
                       required disabled={isLoading} />
                   </div>
+                  <p className="text-gray-400 text-[10px] mt-1">Pour les paiements Mobile Money</p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Méthode de connexion</label>
-                  <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-                    <button type="button" onClick={() => setLoginMethod('phone')} disabled={isLoading}
-                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2 text-sm ${loginMethod === 'phone' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
-                      <Phone className="w-4 h-4" /> Téléphone
-                    </button>
-                    <button type="button" onClick={() => setLoginMethod('email')} disabled={isLoading}
-                      className={`flex-1 py-2 px-4 rounded-md font-medium transition-all flex items-center justify-center gap-2 text-sm ${loginMethod === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
-                      <Mail className="w-4 h-4" /> Email
-                    </button>
-                  </div>
+                {/* Info connexion */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                  <div className="text-gray-500 text-xs">Vous pourrez vous connecter avec votre <strong>email</strong> ou votre <strong>numéro de téléphone</strong></div>
                 </div>
 
-                {loginMethod === 'email' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Adresse email *</label>
-                    <input type="email" value={formData.contact}
-                      onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                      placeholder="votre@email.com"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition text-gray-900 bg-white"
-                      required disabled={isLoading} />
-                  </div>
-                )}
-
-                {loginMethod === 'phone' && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                    <div className="text-blue-600 text-xs">ℹ️ Vous utiliserez votre numéro de téléphone pour vous connecter</div>
-                  </div>
-                )}
-
+                {/* Mot de passe */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe *</label>
                   <div className="relative">
@@ -394,6 +333,7 @@ function RegisterOnboardingPageInner() {
                   </div>
                 </div>
 
+                {/* Confirmer */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe *</label>
                   <div className="relative">
@@ -409,6 +349,7 @@ function RegisterOnboardingPageInner() {
                   </div>
                 </div>
 
+                {/* Code parrain */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Code parrain (optionnel)</label>
                   <input type="text" value={formData.referralCode}
@@ -418,6 +359,7 @@ function RegisterOnboardingPageInner() {
                     disabled={isLoading} />
                 </div>
 
+                {/* CGU */}
                 <div className="flex items-start gap-3">
                   <input type="checkbox" id="terms" checked={formData.acceptTerms}
                     onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
@@ -452,6 +394,7 @@ function RegisterOnboardingPageInner() {
     );
   }
 
+  // ==================== PHASE: SETUP1 ====================
   if (phase === 'setup1') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -460,10 +403,9 @@ function RegisterOnboardingPageInner() {
             <div className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-10 h-10 text-black" />
             </div>
-            <h1 className="text-white text-3xl font-bold mb-2">Compte créé avec succès ! 🎉</h1>
+            <h1 className="text-white text-3xl font-bold mb-2">Compte créé avec succès !</h1>
             <p className="text-gray-400">Complétez votre profil pour accéder à la plateforme</p>
           </div>
-
           <div className="bg-gray-900 border border-gray-800 rounded-3xl p-8">
             <div className="space-y-6">
               <div>
@@ -473,7 +415,6 @@ function RegisterOnboardingPageInner() {
                   placeholder="Jean Dupont"
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-xl focus:border-yellow-400 focus:outline-none transition" required />
               </div>
-
               <div>
                 <label className="block text-white text-sm font-semibold mb-2">Numéro de téléphone *</label>
                 <div className="flex gap-3">
@@ -484,19 +425,17 @@ function RegisterOnboardingPageInner() {
                       <option key={country.code} value={country.code}>{country.flag} {country.code}</option>
                     ))}
                   </select>
-                  <input type="tel" value={formData.contact}
-                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                  <input type="tel" value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="01 02 03 04 05"
                     className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-xl focus:border-yellow-400 focus:outline-none transition" required />
                 </div>
               </div>
-
               <div>
                 <label className="block text-white text-sm font-semibold mb-2">Adresse complète *</label>
                 <input type="text" placeholder="Cocody, Abidjan, Côte d'Ivoire"
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-xl focus:border-yellow-400 focus:outline-none transition" required />
               </div>
-
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <Shield className="text-blue-400 flex-shrink-0 mt-0.5" size={20} />
@@ -506,12 +445,10 @@ function RegisterOnboardingPageInner() {
                   </div>
                 </div>
               </div>
-
               <button onClick={() => setPhase('setup2')}
                 className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2">
                 Continuer <ArrowRight size={20} />
               </button>
-
               <button onClick={() => router.push('/user')}
                 className="w-full text-gray-400 hover:text-white text-sm transition-colors">
                 Passer pour le moment
@@ -523,6 +460,7 @@ function RegisterOnboardingPageInner() {
     );
   }
 
+  // ==================== PHASE: SETUP2 (slides) ====================
   if (phase === 'setup2') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4"
@@ -542,7 +480,6 @@ function RegisterOnboardingPageInner() {
               </div>
             ))}
           </div>
-
           <div className={`bg-gradient-to-br ${currentSlideData.color} rounded-3xl shadow-2xl overflow-hidden`}>
             <div className="p-6 pb-4">
               <div className="w-16 h-16 bg-yellow-400/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 mx-auto">
@@ -550,7 +487,6 @@ function RegisterOnboardingPageInner() {
               </div>
               <h2 className="text-4xl font-black text-white mb-2 text-center">{currentSlideData.title}</h2>
               <p className="text-yellow-400 text-base mb-6 text-center font-medium">{currentSlideData.subtitle}</p>
-
               {currentSlideData.stats && (
                 <div className="grid grid-cols-3 gap-3 mb-8">
                   {currentSlideData.stats.map((stat, idx) => (
@@ -561,7 +497,6 @@ function RegisterOnboardingPageInner() {
                   ))}
                 </div>
               )}
-
               {currentSlideData.features && (
                 <div className="space-y-3 mb-8">
                   {currentSlideData.features.map((feature, idx) => (
@@ -574,7 +509,6 @@ function RegisterOnboardingPageInner() {
                   ))}
                 </div>
               )}
-
               {currentSlideData.steps && (
                 <div className="space-y-3 mb-8">
                   {currentSlideData.steps.map((step, idx) => (
@@ -590,17 +524,15 @@ function RegisterOnboardingPageInner() {
                   ))}
                 </div>
               )}
-
               <p className="text-white/90 text-center text-sm mb-4 font-medium">{currentSlideData.description}</p>
               <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-xl p-4 text-center shadow-xl">
                 <span className="text-black font-black text-sm">{currentSlideData.highlight}</span>
               </div>
             </div>
-
             <div className="bg-black/40 backdrop-blur-sm p-4">
               <button onClick={handleSetup1Next}
                 className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95">
-                {currentSlide === slides.length - 1 ? "Commencer à investir 🚀" : "Suivant"}
+                {currentSlide === slides.length - 1 ? "Commencer à investir" : "Suivant"}
                 <ChevronRight className="w-5 h-5" />
               </button>
               <button onClick={handleSkipSetup1}
@@ -609,7 +541,6 @@ function RegisterOnboardingPageInner() {
               </button>
             </div>
           </div>
-
           {currentSlide === 0 && (
             <div className="mt-4 flex items-center justify-center gap-2 text-white/40 text-xs">
               <span>←</span><span>Glissez pour naviguer</span><span>→</span>

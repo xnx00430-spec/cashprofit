@@ -1,7 +1,7 @@
 // app/(marketing)/components/home/HeroSection.jsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Shield, TrendingUp, Users, Zap } from 'lucide-react';
 
@@ -41,7 +41,6 @@ export default function HeroSection() {
   return (
     <section className="relative min-h-[100dvh] flex flex-col overflow-hidden">
       
-      {/* ===== ANIMATIONS CSS ===== */}
       <style jsx>{`
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(40px); }
@@ -51,17 +50,9 @@ export default function HeroSection() {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        @keyframes slideInLeft {
-          from { opacity: 0; transform: translateX(-30px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
         @keyframes slideInRight {
           from { opacity: 0; transform: translateX(30px); }
           to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.8); }
-          to { opacity: 1; transform: scale(1); }
         }
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
@@ -77,9 +68,7 @@ export default function HeroSection() {
         }
         .animate-fadeUp { animation: fadeUp 0.8s ease-out forwards; }
         .animate-fadeIn { animation: fadeIn 1s ease-out forwards; }
-        .animate-slideInLeft { animation: slideInLeft 0.8s ease-out forwards; }
         .animate-slideInRight { animation: slideInRight 0.8s ease-out forwards; }
-        .animate-scaleIn { animation: scaleIn 0.6s ease-out forwards; }
         .animate-float { animation: float 3s ease-in-out infinite; }
         .animate-pulseGlow { animation: pulseGlow 2s ease-in-out infinite; }
         .shimmer-text {
@@ -109,11 +98,8 @@ export default function HeroSection() {
           className="w-full h-full object-cover object-[center_20%] sm:object-[center_15%]"
           onLoad={() => setLoaded(true)}
         />
-        {/* MOBILE: gradient du bas pour texte lisible */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/10 lg:hidden" />
-        {/* DESKTOP: gradient latéral gauche */}
         <div className="absolute inset-0 hidden lg:block bg-gradient-to-r from-black via-black/70 to-transparent" />
-        {/* Vignette subtile sur les bords */}
         <div className="absolute inset-0 hidden lg:block" style={{ boxShadow: 'inset 0 0 200px rgba(0,0,0,0.3)' }} />
       </div>
 
@@ -127,16 +113,16 @@ export default function HeroSection() {
               <div className="w-2.5 h-2.5 bg-green-400 rounded-full" />
               <div className="absolute inset-0 w-2.5 h-2.5 bg-green-400 rounded-full animate-ping" />
             </div>
-            <span className="text-white text-sm font-semibold tracking-wide"><AnimatedCounter end={3248} /> investisseurs actifs</span>
+            <span className="text-white text-sm font-semibold tracking-wide"><AnimatedCounter end={26000} /> personnes inscrites</span>
           </div>
 
-          {/* TITRE - Impact maximal */}
+          {/* TITRE */}
           <h1 className={`mb-6 opacity-0 ${loaded ? 'animate-fadeUp delay-200' : ''}`}>
             <span className="block text-[2.75rem] sm:text-6xl lg:text-[5.5rem] font-black text-white leading-[0.9] tracking-tight">
               Investissez.
             </span>
             <span className="block text-[2.75rem] sm:text-6xl lg:text-[5.5rem] font-black leading-[0.9] tracking-tight mt-1 shimmer-text">
-              Profitez.
+              Gagnez.
             </span>
             <span className="block text-[2.75rem] sm:text-6xl lg:text-[5.5rem] font-black text-white leading-[0.9] tracking-tight mt-1">
               Chaque semaine.
@@ -145,12 +131,12 @@ export default function HeroSection() {
 
           {/* Sous-titre */}
           <p className={`text-white/70 text-base sm:text-lg lg:text-xl leading-relaxed mb-8 max-w-lg opacity-0 ${loaded ? 'animate-fadeUp delay-400' : ''}`}>
-            Placez votre argent et recevez jusqu&apos;à{' '}
-            <span className="text-yellow-400 font-extrabold">18% de bénéfices par semaine</span>.
-            Vos gains s&apos;affichent en temps réel.
+            Placez votre argent et gagnez jusqu&apos;à{' '}
+            <span className="text-yellow-400 font-extrabold">20% par semaine</span>.
+            Vos gains s&apos;affichent en direct sur votre téléphone, même quand vous dormez.
           </p>
 
-          {/* CTA - Large et impactant */}
+          {/* CTA */}
           <div className={`flex flex-col sm:flex-row gap-3 mb-8 opacity-0 ${loaded ? 'animate-fadeUp delay-500' : ''}`}>
             <Link href="/auth/register"
               className="group relative bg-gradient-to-r from-yellow-400 to-amber-500 text-gray-900 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl text-lg sm:text-xl font-black transition-all hover:shadow-2xl hover:shadow-yellow-500/40 active:scale-[0.97] flex items-center justify-center gap-3 animate-pulseGlow overflow-hidden">
@@ -165,19 +151,19 @@ export default function HeroSection() {
             </a>
           </div>
 
-          {/* STATS - 3 colonnes glassmorphism */}
+          {/* STATS */}
           <div className={`grid grid-cols-3 gap-2 sm:gap-3 mb-6 opacity-0 ${loaded ? 'animate-fadeUp delay-600' : ''}`}>
             <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-5 text-center hover:bg-white/15 transition-all hover:scale-[1.02]">
-              <div className="text-yellow-400 text-2xl sm:text-4xl font-black leading-none">18%</div>
+              <div className="text-yellow-400 text-2xl sm:text-4xl font-black leading-none">20%</div>
               <div className="text-white/40 text-[10px] sm:text-xs font-medium mt-1.5 uppercase tracking-wider">par semaine</div>
             </div>
             <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-5 text-center hover:bg-white/15 transition-all hover:scale-[1.02]">
-              <div className="text-green-400 text-2xl sm:text-4xl font-black leading-none">48h</div>
-              <div className="text-white/40 text-[10px] sm:text-xs font-medium mt-1.5 uppercase tracking-wider">retrait</div>
+              <div className="text-green-400 text-2xl sm:text-4xl font-black leading-none">24h</div>
+              <div className="text-white/40 text-[10px] sm:text-xs font-medium mt-1.5 uppercase tracking-wider">pour retirer</div>
             </div>
             <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-5 text-center hover:bg-white/15 transition-all hover:scale-[1.02]">
               <div className="text-white text-2xl sm:text-4xl font-black leading-none">10K</div>
-              <div className="text-white/40 text-[10px] sm:text-xs font-medium mt-1.5 uppercase tracking-wider">minimum</div>
+              <div className="text-white/40 text-[10px] sm:text-xs font-medium mt-1.5 uppercase tracking-wider">pour commencer</div>
             </div>
           </div>
 
@@ -185,21 +171,21 @@ export default function HeroSection() {
           <div className={`flex flex-wrap items-center gap-4 sm:gap-6 opacity-0 ${loaded ? 'animate-fadeUp delay-700' : ''}`}>
             <div className="flex items-center gap-2 text-white/50 text-xs sm:text-sm">
               <Shield size={14} className="text-green-400" />
-              <span>Capital protégé</span>
+              <span>Votre argent est protégé</span>
             </div>
             <div className="flex items-center gap-2 text-white/50 text-xs sm:text-sm">
               <TrendingUp size={14} className="text-green-400" />
-              <span>Gains temps réel</span>
+              <span>Gains en temps réel</span>
             </div>
             <div className="flex items-center gap-2 text-white/50 text-xs sm:text-sm">
               <Zap size={14} className="text-yellow-400" />
-              <span>Inscription 30 sec</span>
+              <span>Inscription en 30 secondes</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ===== FLOATING CARD DESKTOP - Gains live ===== */}
+      {/* ===== FLOATING CARD - Gains live ===== */}
       <div className={`hidden lg:block absolute top-36 right-12 z-20 opacity-0 ${loaded ? 'animate-slideInRight delay-1000' : ''}`}>
         <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl px-6 py-5 shadow-2xl animate-float">
           <div className="flex items-center gap-4">
@@ -207,26 +193,26 @@ export default function HeroSection() {
               <TrendingUp size={24} className="text-green-400" />
             </div>
             <div>
-              <div className="text-white/50 text-xs font-medium uppercase tracking-wider">Bénéfices / semaine</div>
+              <div className="text-white/50 text-xs font-medium uppercase tracking-wider">Gains cette semaine</div>
               <div className="text-green-400 text-2xl font-black">+<AnimatedCounter end={67450} duration={2500} /> F</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ===== FLOATING CARD DESKTOP - Rejoindre ===== */}
+      {/* ===== FLOATING CARD - Communauté ===== */}
       <div className={`hidden lg:block absolute bottom-28 right-20 z-20 opacity-0 ${loaded ? 'animate-slideInRight delay-1200' : ''}`}>
         <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl px-6 py-4 shadow-2xl animate-float" style={{ animationDelay: '1.5s' }}>
           <div className="flex items-center gap-3">
             <div className="flex -space-x-2">
-              <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-black text-gray-900">BF</div>
-              <div className="w-9 h-9 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-black text-white">GY</div>
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-black text-white">OP</div>
+              <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-black text-gray-900">AK</div>
+              <div className="w-9 h-9 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-black text-white">FM</div>
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-black text-white">OD</div>
               <div className="w-9 h-9 bg-white/20 rounded-full border-2 border-white/20 flex items-center justify-center text-[10px] font-bold text-white">+99</div>
             </div>
             <div>
-              <div className="text-white text-sm font-bold">Ils nous font confiance</div>
-              <div className="text-white/50 text-xs"><AnimatedCounter end={3248} />+ investisseurs</div>
+              <div className="text-white text-sm font-bold">Des milliers de personnes nous font confiance</div>
+              <div className="text-white/50 text-xs"><AnimatedCounter end={26000} />+ inscrits</div>
             </div>
           </div>
         </div>

@@ -5,11 +5,35 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Mail, Phone, Lock, CheckCircle, Loader2 } from 'lucide-react';
 
+const countries = [
+  { code: 'CI', name: 'Côte d\'Ivoire', flag: '🇨🇮', prefix: '+225' },
+  { code: 'SN', name: 'Sénégal', flag: '🇸🇳', prefix: '+221' },
+  { code: 'BF', name: 'Burkina Faso', flag: '🇧🇫', prefix: '+226' },
+  { code: 'BJ', name: 'Bénin', flag: '🇧🇯', prefix: '+229' },
+  { code: 'GH', name: 'Ghana', flag: '🇬🇭', prefix: '+233' },
+  { code: 'NG', name: 'Nigeria', flag: '🇳🇬', prefix: '+234' },
+  { code: 'SL', name: 'Sierra Leone', flag: '🇸🇱', prefix: '+232' },
+  { code: 'TG', name: 'Togo', flag: '🇹🇬', prefix: '+228' },
+  { code: 'CM', name: 'Cameroun', flag: '🇨🇲', prefix: '+237' },
+  { code: 'CG', name: 'Congo', flag: '🇨🇬', prefix: '+242' },
+  { code: 'CD', name: 'RD Congo', flag: '🇨🇩', prefix: '+243' },
+  { code: 'GA', name: 'Gabon', flag: '🇬🇦', prefix: '+241' },
+  { code: 'KE', name: 'Kenya', flag: '🇰🇪', prefix: '+254' },
+  { code: 'TZ', name: 'Tanzanie', flag: '🇹🇿', prefix: '+255' },
+  { code: 'UG', name: 'Ouganda', flag: '🇺🇬', prefix: '+256' },
+  { code: 'RW', name: 'Rwanda', flag: '🇷🇼', prefix: '+250' },
+  { code: 'MZ', name: 'Mozambique', flag: '🇲🇿', prefix: '+258' },
+  { code: 'MW', name: 'Malawi', flag: '🇲🇼', prefix: '+265' },
+  { code: 'ZM', name: 'Zambie', flag: '🇿🇲', prefix: '+260' },
+  { code: 'ML', name: 'Mali', flag: '🇲🇱', prefix: '+223' },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   
   const [showPassword, setShowPassword] = useState(false);
   const [contactMethod, setContactMethod] = useState('phone');
+  const [country, setCountry] = useState('CI');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -25,11 +49,24 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      let loginIdentifier = formData.contact.trim();
+
+      // Si connexion par téléphone, ajouter l'indicatif
+      if (contactMethod === 'phone') {
+        let cleaned = loginIdentifier.replace(/[\s\-\(\)]/g, '');
+        if (!cleaned.startsWith('+')) {
+          const selectedCountry = countries.find(c => c.code === country);
+          const prefix = selectedCountry?.prefix || '+225';
+          cleaned = prefix + cleaned;
+        }
+        loginIdentifier = cleaned;
+      }
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: formData.contact,
+          email: loginIdentifier,
           password: formData.password,
         }),
       });
@@ -123,12 +160,12 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Se connecter avec</label>
               <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
                 <button type="button" onClick={() => setContactMethod('phone')} disabled={isLoading}
-                  className={`py-2 text-sm font-medium transition-colors rounded-md ${contactMethod === 'phone' ? 'bg-white text-black shadow-sm' : 'text-gray-600 hover:text-black'}`}>
-                  Téléphone
+                  className={`py-2 text-sm font-medium transition-colors rounded-md flex items-center justify-center gap-1.5 ${contactMethod === 'phone' ? 'bg-white text-black shadow-sm' : 'text-gray-600 hover:text-black'}`}>
+                  <Phone size={14} /> Téléphone
                 </button>
                 <button type="button" onClick={() => setContactMethod('email')} disabled={isLoading}
-                  className={`py-2 text-sm font-medium transition-colors rounded-md ${contactMethod === 'email' ? 'bg-white text-black shadow-sm' : 'text-gray-600 hover:text-black'}`}>
-                  Email
+                  className={`py-2 text-sm font-medium transition-colors rounded-md flex items-center justify-center gap-1.5 ${contactMethod === 'email' ? 'bg-white text-black shadow-sm' : 'text-gray-600 hover:text-black'}`}>
+                  <Mail size={14} /> Email
                 </button>
               </div>
             </div>
@@ -137,16 +174,40 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {contactMethod === 'phone' ? 'Numéro de téléphone' : 'Adresse email'}
               </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  {contactMethod === 'phone' ? <Phone size={20} /> : <Mail size={20} />}
+
+              {contactMethod === 'phone' ? (
+                <div className="flex gap-2">
+                  <select value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className="w-28 px-2 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#f0b90b] focus:ring-2 focus:ring-[#f0b90b]/20 text-black bg-white text-sm"
+                    disabled={isLoading}>
+                    {countries.map(c => (
+                      <option key={c.code} value={c.code}>{c.flag} {c.prefix}</option>
+                    ))}
+                  </select>
+                  <div className="relative flex-1">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Phone size={18} />
+                    </div>
+                    <input type="tel" value={formData.contact}
+                      onChange={(e) => setFormData({...formData, contact: e.target.value})}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-[#f0b90b] focus:ring-2 focus:ring-[#f0b90b]/20"
+                      placeholder="07 00 00 00 00"
+                      required disabled={isLoading} />
+                  </div>
                 </div>
-                <input type={contactMethod === 'phone' ? 'tel' : 'email'} value={formData.contact}
-                  onChange={(e) => setFormData({...formData, contact: e.target.value})}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-[#f0b90b] focus:ring-2 focus:ring-[#f0b90b]/20"
-                  placeholder={contactMethod === 'phone' ? '+225 07 XX XX XX XX' : 'exemple@email.com'}
-                  required disabled={isLoading} />
-              </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Mail size={20} />
+                  </div>
+                  <input type="email" value={formData.contact}
+                    onChange={(e) => setFormData({...formData, contact: e.target.value})}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-[#f0b90b] focus:ring-2 focus:ring-[#f0b90b]/20"
+                    placeholder="exemple@email.com"
+                    required disabled={isLoading} />
+                </div>
+              )}
             </div>
 
             <div>

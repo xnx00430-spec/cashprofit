@@ -4,7 +4,7 @@ import connectDB from '@/lib/db';
 import Withdrawal from '@/models/Withdrawal';
 import User from '@/models/User';
 import { verifyAuth } from '@/lib/auth';
-import { createNotification, NotificationTemplates } from '@/lib/notifications';
+import { createNotification, NotificationTemplates, sendWithdrawalCompletedEmail } from '@/lib/notifications';
 
 // PUT - Approuver ou Rejeter un retrait (ADMIN ONLY)
 export async function PUT(request, context) {
@@ -61,6 +61,9 @@ export async function PUT(request, context) {
       );
     }
 
+    // Récupérer le user
+    const user = await User.findById(withdrawal.userId).select('name email phone');
+
     // Appliquer l'action
     switch (action) {
       case 'approve':
@@ -68,7 +71,7 @@ export async function PUT(request, context) {
         if (adminNotes) withdrawal.adminNotes = adminNotes;
         await withdrawal.save();
         
-        // 🔔 NOTIFICATION: Retrait approuvé
+        // 🔔 Notification in-app
         try {
           await createNotification(
             withdrawal.userId,
@@ -82,7 +85,7 @@ export async function PUT(request, context) {
         if (adminNotes) withdrawal.adminNotes = adminNotes;
         await withdrawal.save();
         
-        // 🔔 NOTIFICATION: Retrait rejeté
+        // 🔔 Notification in-app
         try {
           await createNotification(
             withdrawal.userId,
@@ -106,18 +109,23 @@ export async function PUT(request, context) {
           await withdrawal.save();
         }
         
-        // 🔔 NOTIFICATION: Retrait complété
+        // 🔔 Notification in-app
         try {
           await createNotification(
             withdrawal.userId,
             NotificationTemplates.withdrawalCompleted(withdrawal.amount)
           );
         } catch (e) { console.error('Notif error:', e); }
+
+        // ✉️ EMAIL: Retrait complété (argent envoyé)
+        if (user?.email) {
+          sendWithdrawalCompletedEmail(user.email, user.name, {
+            amount: withdrawal.amount,
+            method: withdrawal.paymentMethod
+          }).catch(console.error);
+        }
         break;
     }
-
-    // Récupérer le user pour la réponse
-    const user = await User.findById(withdrawal.userId).select('name email');
 
     return NextResponse.json({
       success: true,

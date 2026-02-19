@@ -7,7 +7,8 @@ import {
   User, Mail, Phone, MapPin, Calendar, Shield,
   Edit2, Save, X, Copy, CheckCircle, Camera,
   Lock, Key, Eye, EyeOff, Award, TrendingUp,
-  Users, DollarSign, FileText, Upload, MessageCircle, Headphones
+  Users, DollarSign, FileText, Upload, MessageCircle, Headphones,
+  AlertCircle, Clock, Loader2
 } from 'lucide-react';
 
 export default function ProfilPage() {
@@ -20,24 +21,11 @@ export default function ProfilPage() {
   const [showPhone, setShowPhone] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({
-    firstName: '',
-    lastName: '',
-    phone: '',
-    address: ''
-  });
+  const [editData, setEditData] = useState({ firstName: '', lastName: '', phone: '', address: '' });
   
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false
-  });
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
   
   const [copied, setCopied] = useState(false);
 
@@ -72,27 +60,17 @@ export default function ProfilPage() {
         const invRes = await fetch('/api/user/investments');
         const invData = await invRes.json();
         if (invData.success) {
-          setStats(prev => ({
-            ...prev,
-            activeInvestments: invData.investments?.length || 0
-          }));
+          setStats(prev => ({ ...prev, activeInvestments: invData.investments?.length || 0 }));
         }
-      } catch (e) {
-        console.error('Erreur investments:', e);
-      }
+      } catch (e) { console.error('Erreur investments:', e); }
 
       try {
         const refRes = await fetch('/api/user/referrals');
         const refData = await refRes.json();
         if (refData.success) {
-          setStats(prev => ({
-            ...prev,
-            totalReferrals: refData.referrals?.length || 0
-          }));
+          setStats(prev => ({ ...prev, totalReferrals: refData.referrals?.length || 0 }));
         }
-      } catch (e) {
-        console.error('Erreur referrals:', e);
-      }
+      } catch (e) { console.error('Erreur referrals:', e); }
     } catch (error) {
       console.error('Erreur:', error);
     } finally {
@@ -107,9 +85,7 @@ export default function ProfilPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editData)
       });
-
       const data = await res.json();
-      
       if (data.success) {
         setUser({ ...user, ...editData });
         setIsEditing(false);
@@ -129,32 +105,21 @@ export default function ProfilPage() {
       alert('❌ Les mots de passe ne correspondent pas');
       return;
     }
-
     if (passwordData.newPassword.length < 6) {
       alert('❌ Le mot de passe doit contenir au moins 6 caractères');
       return;
     }
-
     try {
       const res = await fetch('/api/user/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
+        body: JSON.stringify({ currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword })
       });
-
       const data = await res.json();
-      
       if (data.success) {
         alert('✅ Mot de passe modifié avec succès');
         setShowPasswordForm(false);
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
         alert('❌ ' + data.message);
       }
@@ -169,9 +134,7 @@ export default function ProfilPage() {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Erreur copie:', error);
-    }
+    } catch (error) { console.error('Erreur copie:', error); }
   };
 
   if (!mounted || loading) {
@@ -190,7 +153,8 @@ export default function ProfilPage() {
     );
   }
 
-  const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  const fullName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  const kycStatus = user.kyc?.status || 'null';
 
   return (
     <div className="min-h-screen bg-white p-6">
@@ -198,9 +162,7 @@ export default function ProfilPage() {
         
         <div className="mb-8">
           <h1 className="text-gray-900 text-3xl font-bold mb-2">Mon Profil</h1>
-          <p className="text-gray-600 text-sm">
-            Gérez vos informations personnelles et paramètres
-          </p>
+          <p className="text-gray-600 text-sm">Gérez vos informations personnelles et paramètres</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -210,15 +172,13 @@ export default function ProfilPage() {
             
             {/* CARD PRINCIPALE */}
             <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
-              
               <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-6">
-                
                 <div className="relative">
                   <div className="w-32 h-32 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-white text-4xl font-bold overflow-hidden">
                     {user.avatar ? (
                       <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U'
+                      (fullName?.[0] || 'U').toUpperCase()
                     )}
                   </div>
                 </div>
@@ -226,7 +186,7 @@ export default function ProfilPage() {
                 <div className="flex-1 text-center md:text-left">
                   <div className="flex items-center gap-3 justify-center md:justify-start mb-2">
                     <h2 className="text-gray-900 text-2xl font-bold">{fullName}</h2>
-                    {user.kyc?.status === 'approved' && (
+                    {kycStatus === 'approved' && (
                       <div className="bg-green-50 border border-green-200 rounded-full px-3 py-1 flex items-center gap-1">
                         <CheckCircle size={14} className="text-green-600" />
                         <span className="text-green-600 text-xs font-medium">Vérifié</span>
@@ -237,26 +197,20 @@ export default function ProfilPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-gray-600 justify-center md:justify-start">
                       <Mail size={14} />
-                      <span>
-                        {showEmail ? user.email : user.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3')}
-                      </span>
-                      <button onClick={() => setShowEmail(!showEmail)} className="text-gray-500 hover:text-gray-900 transition-colors">
+                      <span>{showEmail ? user.email : user.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3')}</span>
+                      <button onClick={() => setShowEmail(!showEmail)} className="text-gray-500 hover:text-gray-900">
                         {showEmail ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
-                    
                     {user.phone && (
                       <div className="flex items-center gap-2 text-gray-600 justify-center md:justify-start">
                         <Phone size={14} />
-                        <span>
-                          {showPhone ? user.phone : user.phone?.replace(/(\d{3})(\d*)(\d{2})/, '$1****$3')}
-                        </span>
-                        <button onClick={() => setShowPhone(!showPhone)} className="text-gray-500 hover:text-gray-900 transition-colors">
+                        <span>{showPhone ? user.phone : user.phone?.replace(/(\d{3})(\d*)(\d{2})/, '$1****$3')}</span>
+                        <button onClick={() => setShowPhone(!showPhone)} className="text-gray-500 hover:text-gray-900">
                           {showPhone ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
                       </div>
                     )}
-                    
                     {user.address && (
                       <div className="flex items-center gap-2 text-gray-600 justify-center md:justify-start">
                         <MapPin size={14} />
@@ -273,8 +227,7 @@ export default function ProfilPage() {
                 {!isEditing && (
                   <button onClick={() => setIsEditing(true)}
                     className="bg-gray-200 hover:bg-gray-300 text-gray-900 px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
-                    <Edit2 size={16} />
-                    <span>Modifier</span>
+                    <Edit2 size={16} /> <span>Modifier</span>
                   </button>
                 )}
               </div>
@@ -282,7 +235,6 @@ export default function ProfilPage() {
               {isEditing && (
                 <div className="bg-white/70 backdrop-blur-xl border border-gray-200 rounded-2xl p-6 mb-6 shadow-sm">
                   <h3 className="text-gray-900 font-bold mb-4">Modifier mes informations</h3>
-                  
                   <div className="space-y-4">
                     <div>
                       <label className="text-gray-600 text-sm mb-2 block">Prénom</label>
@@ -306,11 +258,11 @@ export default function ProfilPage() {
                     </div>
                     <div className="flex gap-3">
                       <button onClick={() => setIsEditing(false)}
-                        className="flex-1 bg-gray-200 text-gray-900 py-3 rounded-xl hover:bg-gray-300 transition-colors flex items-center justify-center gap-2">
+                        className="flex-1 bg-gray-200 text-gray-900 py-3 rounded-xl hover:bg-gray-300 flex items-center justify-center gap-2">
                         <X size={18} /> Annuler
                       </button>
                       <button onClick={handleSaveProfile}
-                        className="flex-1 bg-yellow-400 text-white py-3 rounded-xl hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 font-semibold shadow-md">
+                        className="flex-1 bg-yellow-400 text-white py-3 rounded-xl hover:bg-yellow-500 flex items-center justify-center gap-2 font-semibold shadow-md">
                         <Save size={18} /> Enregistrer
                       </button>
                     </div>
@@ -345,11 +297,10 @@ export default function ProfilPage() {
                   <p className="text-gray-600 text-sm">Protégez votre compte</p>
                 </div>
               </div>
-
               <div className="space-y-4">
                 <div>
                   <button onClick={() => setShowPasswordForm(!showPasswordForm)}
-                    className="w-full bg-white/70 backdrop-blur-xl hover:bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center justify-between transition-colors shadow-sm">
+                    className="w-full bg-white/70 hover:bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center justify-between transition-colors shadow-sm">
                     <div className="flex items-center gap-3">
                       <Lock className="text-gray-600" size={20} />
                       <div className="text-left">
@@ -359,47 +310,27 @@ export default function ProfilPage() {
                     </div>
                     <Key className="text-gray-600" size={20} />
                   </button>
-
                   {showPasswordForm && (
-                    <div className="mt-4 bg-white/70 backdrop-blur-xl border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm">
-                      <div>
-                        <label className="text-gray-600 text-xs mb-2 block">Mot de passe actuel</label>
-                        <div className="relative">
-                          <input type={showPasswords.current ? 'text' : 'password'} value={passwordData.currentPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2 pr-10 focus:border-yellow-400 focus:outline-none" />
-                          <button onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600">
-                            {showPasswords.current ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
+                    <div className="mt-4 bg-white/70 border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm">
+                      {['current', 'new', 'confirm'].map((field) => (
+                        <div key={field}>
+                          <label className="text-gray-600 text-xs mb-2 block">
+                            {field === 'current' ? 'Mot de passe actuel' : field === 'new' ? 'Nouveau mot de passe' : 'Confirmer'}
+                          </label>
+                          <div className="relative">
+                            <input type={showPasswords[field] ? 'text' : 'password'}
+                              value={passwordData[field === 'current' ? 'currentPassword' : field === 'new' ? 'newPassword' : 'confirmPassword']}
+                              onChange={(e) => setPasswordData({ ...passwordData, [field === 'current' ? 'currentPassword' : field === 'new' ? 'newPassword' : 'confirmPassword']: e.target.value })}
+                              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2 pr-10 focus:border-yellow-400 focus:outline-none" />
+                            <button onClick={() => setShowPasswords({ ...showPasswords, [field]: !showPasswords[field] })}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600">
+                              {showPasswords[field] ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <label className="text-gray-600 text-xs mb-2 block">Nouveau mot de passe</label>
-                        <div className="relative">
-                          <input type={showPasswords.new ? 'text' : 'password'} value={passwordData.newPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2 pr-10 focus:border-yellow-400 focus:outline-none" />
-                          <button onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600">
-                            {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-gray-600 text-xs mb-2 block">Confirmer nouveau mot de passe</label>
-                        <div className="relative">
-                          <input type={showPasswords.confirm ? 'text' : 'password'} value={passwordData.confirmPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2 pr-10 focus:border-yellow-400 focus:outline-none" />
-                          <button onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600">
-                            {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
+                      ))}
                       <button onClick={handleChangePassword}
-                        className="w-full bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-3 rounded-lg transition-colors shadow-md">
+                        className="w-full bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-3 rounded-lg shadow-md">
                         Modifier le mot de passe
                       </button>
                     </div>
@@ -416,13 +347,12 @@ export default function ProfilPage() {
                 </div>
                 <div>
                   <h3 className="text-gray-900 text-xl font-bold">Support</h3>
-                  <p className="text-gray-600 text-sm">Besoin d'aide ? Contactez-nous</p>
+                  <p className="text-gray-600 text-sm">Besoin d&apos;aide ? Contactez-nous</p>
                 </div>
               </div>
-
               <div className="space-y-3">
                 <a href="mailto:support@cashprofit.fr"
-                  className="w-full bg-white/70 backdrop-blur-xl hover:bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center gap-4 transition-colors shadow-sm">
+                  className="w-full bg-white/70 hover:bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center gap-4 transition-colors shadow-sm">
                   <div className="w-10 h-10 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Mail className="text-blue-600" size={20} />
                   </div>
@@ -430,30 +360,22 @@ export default function ProfilPage() {
                     <div className="text-gray-900 font-semibold text-sm">Email</div>
                     <div className="text-gray-600 text-xs">support@cashprofit.fr</div>
                   </div>
-                  <div className="text-gray-400 text-xs">Réponse sous 24h</div>
                 </a>
-
                 <a href="https://wa.me/47XXXXXXXXXXXX?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20sur%20CashProfit"
                   target="_blank" rel="noopener noreferrer"
-                  className="w-full bg-white/70 backdrop-blur-xl hover:bg-green-50 border border-gray-200 hover:border-green-200 rounded-xl p-4 flex items-center gap-4 transition-colors shadow-sm">
+                  className="w-full bg-white/70 hover:bg-green-50 border border-gray-200 hover:border-green-200 rounded-xl p-4 flex items-center gap-4 transition-colors shadow-sm">
                   <div className="w-10 h-10 bg-green-50 border border-green-200 rounded-xl flex items-center justify-center flex-shrink-0">
                     <MessageCircle className="text-green-600" size={20} />
                   </div>
                   <div className="flex-1">
                     <div className="text-gray-900 font-semibold text-sm">WhatsApp</div>
-                    <div className="text-gray-600 text-xs">Chat en direct avec le support</div>
+                    <div className="text-gray-600 text-xs">Chat en direct</div>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
                     <span className="text-green-600 text-xs font-medium">En ligne</span>
                   </div>
                 </a>
-              </div>
-
-              <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-3">
-                <div className="text-gray-600 text-xs text-center">
-                  Notre équipe est disponible du lundi au samedi, de 9h à 18h (GMT)
-                </div>
               </div>
             </div>
           </div>
@@ -471,7 +393,7 @@ export default function ProfilPage() {
                 </div>
               </div>
               <Link href="/user/reseau"
-                className="block w-full bg-white text-yellow-600 py-3 rounded-xl font-semibold text-center hover:bg-gray-50 transition-colors shadow-md">
+                className="block w-full bg-white text-yellow-600 py-3 rounded-xl font-semibold text-center hover:bg-gray-50 shadow-md">
                 Voir progression
               </Link>
             </div>
@@ -497,21 +419,99 @@ export default function ProfilPage() {
               </div>
             )}
 
-            {/* KYC */}
+            {/* ==================== KYC DYNAMIQUE ==================== */}
             <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
               <div className="flex items-center gap-3 mb-4">
                 <FileText className="text-gray-600" size={20} />
-                <h3 className="text-gray-900 font-bold">Vérification d'identité</h3>
+                <h3 className="text-gray-900 font-bold">Vérification d&apos;identité</h3>
               </div>
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                <div className="flex items-center justify-center gap-2 text-green-600">
-                  <CheckCircle size={20} />
-                  <span className="font-semibold">Compte vérifié</span>
+
+              {/* APPROUVÉ */}
+              {kycStatus === 'approved' && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <div className="flex items-center justify-center gap-2 text-green-600">
+                    <CheckCircle size={20} />
+                    <span className="font-semibold">Compte vérifié</span>
+                  </div>
+                  <div className="text-center text-green-600 text-xs mt-2">
+                    Toutes les fonctionnalités sont accessibles
+                  </div>
                 </div>
-                <div className="text-center text-green-600 text-xs mt-2">
-                  Toutes les fonctionnalités sont accessibles
+              )}
+
+              {/* EN ATTENTE */}
+              {kycStatus === 'pending' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                  <div className="flex items-center justify-center gap-2 text-yellow-600">
+                    <Clock size={20} />
+                    <span className="font-semibold">Vérification en cours</span>
+                  </div>
+                  <div className="text-center text-yellow-600 text-xs mt-2">
+                    Vos documents sont en cours de vérification
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* REJETÉ */}
+              {kycStatus === 'rejected' && (
+                <div>
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
+                    <div className="flex items-center justify-center gap-2 text-red-600">
+                      <AlertCircle size={20} />
+                      <span className="font-semibold">Vérification rejetée</span>
+                    </div>
+                    {user.kyc?.currentSubmission?.adminMessage && (
+                      <div className="text-center text-red-600 text-xs mt-2">
+                        {user.kyc.currentSubmission.adminMessage}
+                      </div>
+                    )}
+                  </div>
+                  <Link href="/user/profil/kyc"
+                    className="block w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold text-center shadow-md">
+                    Resoumettre
+                  </Link>
+                </div>
+              )}
+
+              {/* INFOS SUPPLÉMENTAIRES REQUISES */}
+              {kycStatus === 'need_more_info' && (
+                <div>
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-3">
+                    <div className="flex items-center justify-center gap-2 text-orange-600">
+                      <AlertCircle size={20} />
+                      <span className="font-semibold">Informations requises</span>
+                    </div>
+                    {user.kyc?.currentSubmission?.adminMessage && (
+                      <div className="text-center text-orange-600 text-xs mt-2">
+                        {user.kyc.currentSubmission.adminMessage}
+                      </div>
+                    )}
+                  </div>
+                  <Link href="/user/profil/kyc"
+                    className="block w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-semibold text-center shadow-md">
+                    Compléter
+                  </Link>
+                </div>
+              )}
+
+              {/* PAS ENCORE SOUMIS */}
+              {(kycStatus === 'null' || !kycStatus) && (
+                <div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-3">
+                    <div className="flex items-center justify-center gap-2 text-blue-600">
+                      <Shield size={20} />
+                      <span className="font-semibold">Non vérifié</span>
+                    </div>
+                    <div className="text-center text-blue-600 text-xs mt-2">
+                      Complétez votre KYC pour pouvoir retirer vos bénéfices
+                    </div>
+                  </div>
+                  <Link href="/user/profil/kyc"
+                    className="block w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold text-center shadow-md">
+                    Vérifier mon identité
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>

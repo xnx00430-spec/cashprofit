@@ -107,13 +107,10 @@ export default function PortefeuillePage() {
     }
   };
 
-  // Gains live (déjà nets via l'API investments)
   const getLiveEarnings = () => investments.reduce((sum, inv) => sum + (inv.currentEarnings || 0), 0);
-  
-  // Total bénéfices = solde DB + gains live (pas encore synchronisés)
-  const getTotalBenefices = () => (balances?.benefices || 0) + getLiveEarnings();
+  const getUnsyncedEarnings = () => investments.reduce((sum, inv) => sum + (inv.unsyncedEarnings || 0), 0);
+  const getTotalBenefices = () => (balances?.benefices || 0) + getUnsyncedEarnings();
 
-  // 1% retirable à tout moment, 100% au niveau 10
   const getWithdrawableBonus = () => {
     if (!user || !balances) return 0;
     return user.level >= 10 ? balances.bonus : balances.bonus * 0.01;
@@ -122,24 +119,24 @@ export default function PortefeuillePage() {
   const handleWithdraw = async () => {
     const minAmount = withdrawType === 'bonus' ? 100 : 1000;
     if (!withdrawAmount || withdrawAmount < minAmount) {
-      showModal('error', 'Montant invalide', `Le montant minimum de retrait est de ${minAmount.toLocaleString()} FCFA`);
+      showModal('error', 'Montant trop bas', `Le minimum pour retirer est de ${minAmount.toLocaleString()} FCFA`);
       return;
     }
     if (!accountNumber || !accountName) {
-      showModal('error', 'Champs manquants', 'Veuillez remplir le numéro de compte et le nom complet');
+      showModal('error', 'Informations manquantes', 'Entrez votre numéro de téléphone et votre nom complet pour recevoir l\'argent');
       return;
     }
     if (withdrawType === 'bonus') {
       const maxBonus = getWithdrawableBonus();
       if (parseFloat(withdrawAmount) > maxBonus) {
-        showModal('warning', 'Montant trop élevé', `Maximum retirable : ${maxBonus.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} FCFA (${user.level >= 10 ? '100%' : '1%'})`);
+        showModal('warning', 'Montant trop élevé', `Vous pouvez retirer maximum ${maxBonus.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} FCFA (${user.level >= 10 ? '100%' : '1%'} de votre bonus)`);
         return;
       }
     }
     if (withdrawType === 'commissions') {
       const maxComm = balances?.commissions || 0;
       if (parseFloat(withdrawAmount) > maxComm) {
-        showModal('warning', 'Montant trop élevé', `Maximum retirable : ${maxComm.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA`);
+        showModal('warning', 'Montant trop élevé', `Vous avez ${maxComm.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA de commissions disponibles`);
         return;
       }
     }
@@ -159,7 +156,7 @@ export default function PortefeuillePage() {
       });
       const data = await res.json();
       if (data.success) {
-        showModal('success', 'Retrait demandé ✅', `Votre demande de ${parseFloat(withdrawAmount).toLocaleString()} FCFA a été enregistrée.\n\nDélai : 24-48 heures.`);
+        showModal('success', 'Retrait demandé', `Votre demande de ${parseFloat(withdrawAmount).toLocaleString()} FCFA a été enregistrée.\n\nVous recevrez l'argent sur votre compte en moins de 24 heures.`);
         setShowWithdrawModal(false);
         setWithdrawAmount('');
         setAccountNumber('');
@@ -167,21 +164,19 @@ export default function PortefeuillePage() {
         fetchAllData();
       } else {
         if (data.needsKYC) {
-          showModal('confirm', 'Vérification KYC requise', 'Veuillez compléter votre KYC pour effectuer votre premier retrait.', {
+          showModal('confirm', 'Vérification d\'identité requise', 'Pour retirer de l\'argent, vous devez d\'abord vérifier votre identité. C\'est rapide et automatique.', {
             onConfirm: () => { hideModal(); router.push('/user/profil/kyc'); },
-            confirmText: 'Soumettre le KYC',
+            confirmText: 'Vérifier maintenant',
             cancelText: 'Plus tard'
           });
         } else if (data.blocked) {
-          showModal('error', 'Bénéfices bloqués', `${data.message}\n\nCommissions disponibles : ${(data.details?.commissionsAvailable || 0).toLocaleString()} FCFA`);
-        } else if (data.cooldown) {
-          showModal('warning', '⏳ Délai de 3 jours', data.message);
+          showModal('error', 'Gains bloqués', `${data.message}\n\nVos commissions restent disponibles : ${(data.details?.commissionsAvailable || 0).toLocaleString()} FCFA`);
         } else {
-          showModal('error', 'Erreur', data.message || 'Erreur lors de la demande');
+          showModal('error', 'Erreur', data.message || 'Une erreur est survenue');
         }
       }
     } catch (error) {
-      showModal('error', 'Erreur réseau', 'Impossible de contacter le serveur.');
+      showModal('error', 'Erreur réseau', 'Impossible de contacter le serveur. Vérifiez votre connexion internet.');
     } finally {
       setIsWithdrawing(false);
     }
@@ -195,16 +190,14 @@ export default function PortefeuillePage() {
     setShowWithdrawModal(true);
   };
 
-  const getStatusIcon = (s) => {
-    const m = {
-      pending: <Clock className="text-yellow-500" size={16} />,
-      approved: <CheckCircle className="text-blue-500" size={16} />,
-      completed: <CheckCircle className="text-green-500" size={16} />,
-      rejected: <XCircle className="text-red-500" size={16} />
-    };
-    return m[s] || <AlertCircle className="text-gray-500" size={16} />;
-  };
-  const getStatusText = (s) => ({ pending: 'En attente', approved: 'Approuvé', completed: 'Complété', rejected: 'Rejeté' }[s] || s);
+  const getStatusIcon = (s) => ({
+    pending: <Clock className="text-yellow-500" size={16} />,
+    approved: <CheckCircle className="text-blue-500" size={16} />,
+    completed: <CheckCircle className="text-green-500" size={16} />,
+    rejected: <XCircle className="text-red-500" size={16} />
+  }[s] || <AlertCircle className="text-gray-500" size={16} />);
+  
+  const getStatusText = (s) => ({ pending: 'En attente', approved: 'En cours', completed: 'Reçu', rejected: 'Refusé' }[s] || s);
   const getStatusColor = (s) => ({ pending: 'bg-yellow-50 text-yellow-600 border-yellow-200', approved: 'bg-blue-50 text-blue-600 border-blue-200', completed: 'bg-green-50 text-green-600 border-green-200', rejected: 'bg-red-50 text-red-600 border-red-200' }[s] || 'bg-gray-50 text-gray-600 border-gray-200');
 
   if (!mounted) return null;
@@ -213,201 +206,234 @@ export default function PortefeuillePage() {
   const totalBenefices = getTotalBenefices();
   const withdrawableBonus = getWithdrawableBonus();
   const bonusPercentage = user?.level >= 10 ? 100 : 1;
+  const commissions = balances?.commissions || 0;
 
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto">
         <Modal {...modal} onClose={hideModal} />
 
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-gray-900 text-3xl font-bold mb-2">Portefeuille</h1>
-          <p className="text-gray-600 text-sm">Gérez vos soldes et demandes de retrait</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-gray-900 text-3xl font-bold mb-1">Mon portefeuille</h1>
+              <p className="text-gray-500 text-sm">Ici vous voyez tout l&apos;argent que vous avez gagné et vous pouvez demander un retrait</p>
+            </div>
+            <button onClick={() => setShowBalances(!showBalances)} className="text-gray-400 hover:text-gray-900 p-2">
+              {showBalances ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
         </div>
 
+        {/* Alerte bloqué */}
         {user?.benefitsBlocked && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-8">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-8">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="text-red-500" size={24} />
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Lock className="text-red-500" size={20} />
               </div>
               <div className="flex-1">
-                <h3 className="text-red-600 font-bold text-lg mb-2">⚠️ Bénéfices bloqués</h3>
-                <p className="text-red-600/80 text-sm mb-4">Parrainez des affiliés pour débloquer vos bénéfices. Vos commissions et bonus restent accessibles.</p>
-                <Link href="/user/reseau" className="inline-block bg-red-500 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-xl">Parrainer</Link>
+                <h3 className="text-red-700 font-bold mb-1">Vos gains sont bloqués</h3>
+                <p className="text-red-600/80 text-sm mb-3">Vous n&apos;avez pas atteint votre objectif dans les délais. Invitez des personnes à investir pour débloquer vos gains. Vos commissions et bonus restent accessibles.</p>
+                <Link href="/user/reseau" className="inline-block bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm">Inviter des proches</Link>
               </div>
             </div>
           </div>
         )}
 
+        {/* 3 CARTES */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 
           {/* ==================== BÉNÉFICES ==================== */}
           <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center">
-                  <Wallet className="text-gray-900" size={20} />
-                </div>
-                <div>
-                  <div className="text-gray-600 text-xs">Bénéfices Personnels</div>
-                  <div className="text-gray-900 text-xl font-bold">
-                    {showBalances
-                      ? `${totalBenefices.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F`
-                      : '••••••'}
-                  </div>
-                </div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center">
+                <Wallet className="text-gray-900" size={20} />
               </div>
-              <button onClick={() => setShowBalances(!showBalances)} className="text-gray-500 hover:text-gray-900">
-                {showBalances ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
+              <div>
+                <div className="text-gray-900 text-sm font-semibold">Bénéfices à retirer</div>
+                <div className="text-gray-400 text-[10px]">Ce que vous pouvez retirer maintenant</div>
+              </div>
+            </div>
+
+            <div className="my-4">
+              <div className="text-gray-900 text-2xl font-bold">
+                {showBalances
+                  ? `${totalBenefices.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F`
+                  : '••••••'}
+              </div>
             </div>
 
             {showBalances && liveEarnings > 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-green-600 text-xs font-medium">Gains en cours (live)</span>
+                  <span className="text-green-600 text-xs font-medium">Gains en direct</span>
                 </div>
                 <div className="text-green-700 text-lg font-bold font-mono">
                   +{liveEarnings.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F
                 </div>
+                <div className="text-green-600/60 text-[10px] mt-1">Total gagné depuis le début (augmente chaque seconde)</div>
+                {liveEarnings > totalBenefices && (
+                  <div className="text-gray-500 text-[10px] mt-1">Vous avez déjà retiré {(liveEarnings - totalBenefices).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F</div>
+                )}
                 {hasReferrer && (
-                  <div className="text-orange-500 text-[10px] mt-1">Net après 10% commission parrain</div>
+                  <div className="text-orange-500 text-[10px] mt-1">Net après 10% pour votre parrain</div>
                 )}
               </div>
             )}
 
             {user?.benefitsBlocked && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
                 <div className="flex items-start gap-2">
-                  <Lock className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+                  <Lock className="text-red-500 flex-shrink-0 mt-0.5" size={14} />
                   <div className="text-red-600 text-xs">
-                    <div className="font-semibold">Bloqués</div>
-                    <div>Parrainez pour débloquer</div>
+                    Bloqués — Invitez des personnes pour débloquer
                   </div>
                 </div>
+              </div>
+            )}
+
+            {!user?.benefitsBlocked && totalBenefices > 0 && totalBenefices < 1000 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-3">
+                <div className="text-orange-600 text-xs">Minimum 1,000 FCFA pour retirer. Il vous manque {Math.ceil(1000 - totalBenefices).toLocaleString()} F</div>
               </div>
             )}
 
             <button
               onClick={() => openWithdrawModal('gains')}
               disabled={user?.benefitsBlocked || totalBenefices < 1000}
-              className={`w-full py-3 rounded-xl font-semibold transition-colors shadow-md ${
+              className={`w-full py-3 rounded-xl font-semibold transition-colors text-sm ${
                 user?.benefitsBlocked || totalBenefices < 1000
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-900 text-white hover:bg-gray-800'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
               }`}
             >
               {user?.benefitsBlocked
-                ? '🔒 Bloqué'
+                ? 'Bloqué — Invitez pour débloquer'
                 : totalBenefices >= 1000
-                  ? `Retirer ${Math.floor(totalBenefices).toLocaleString()} F`
+                  ? `Retirer mes bénéfices`
                   : 'Retirer'}
             </button>
           </div>
 
           {/* ==================== COMMISSIONS ==================== */}
           <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
                 <Users className="text-green-600" size={20} />
               </div>
               <div>
-                <div className="text-gray-600 text-xs">Commissions</div>
-                <div className="text-gray-900 text-xl font-bold">
-                  {showBalances
-                    ? `${(balances?.commissions || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F`
-                    : '••••••'}
-                </div>
+                <div className="text-gray-900 text-sm font-semibold">Vos commissions</div>
+                <div className="text-gray-400 text-[10px]">L&apos;argent gagné grâce aux personnes que vous avez invitées</div>
               </div>
             </div>
 
-            {(balances?.commissions || 0) > 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-green-600 text-xs font-medium">10% des bénéfices de vos affiliés</span>
-                </div>
+            <div className="my-4">
+              <div className="text-gray-900 text-2xl font-bold">
+                {showBalances
+                  ? `${commissions.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F`
+                  : '••••••'}
+              </div>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
+              <div className="text-green-700 text-xs font-medium mb-1">Comment ça marche</div>
+              <div className="text-green-600 text-[10px] leading-relaxed">
+                Chaque semaine, vous recevez automatiquement 10% des gains de chaque personne que vous avez invitée. Plus vous invitez, plus vous gagnez.
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-3">
+              <div className="text-gray-500 text-[10px]">Retirable à tout moment dès 1,000 FCFA, sans condition</div>
+            </div>
+
+            {commissions > 0 && commissions < 1000 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-3">
+                <div className="text-orange-600 text-xs">Minimum 1,000 FCFA pour retirer. Il vous manque {Math.ceil(1000 - commissions).toLocaleString()} F</div>
               </div>
             )}
 
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
-              <div className="text-green-600 text-xs">✅ Toujours retirable sans condition</div>
-            </div>
-
             <button
               onClick={() => openWithdrawModal('commissions')}
-              disabled={(balances?.commissions || 0) <= 0}
-              className={`w-full py-3 rounded-xl font-semibold transition-colors shadow-md ${
-                (balances?.commissions || 0) <= 0
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-500 text-white hover:bg-green-600'
+              disabled={commissions < 1000}
+              className={`w-full py-3 rounded-xl font-semibold transition-colors text-sm ${
+                commissions < 1000
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-green-500 text-white hover:bg-green-600 shadow-md'
               }`}
             >
-              {(balances?.commissions || 0) > 0
-                ? `Retirer ${(balances?.commissions || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F`
-                : 'Retirer'}
+              {commissions >= 1000 ? 'Retirer mes commissions' : 'Retirer'}
             </button>
           </div>
 
           {/* ==================== BONUS ==================== */}
           <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-12 h-12 bg-yellow-50 rounded-2xl flex items-center justify-center">
                 <Gift className="text-yellow-600" size={20} />
               </div>
               <div>
-                <div className="text-gray-600 text-xs">Bonus Parrainage</div>
-                <div className="text-gray-900 text-xl font-bold">
-                  {showBalances ? `${(balances?.bonus || 0).toLocaleString()} F` : '••••••'}
-                </div>
+                <div className="text-gray-900 text-sm font-semibold">Vos bonus</div>
+                <div className="text-gray-400 text-[10px]">10,000 FCFA reçus pour chaque personne invitée qui investit</div>
               </div>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
-              <div className="text-yellow-600 text-xs mb-2">🎁 10,000 FCFA par affilié</div>
-              <div className="flex justify-between">
-                <span className="text-yellow-700 text-xs">Retirable :</span>
+            <div className="my-4">
+              <div className="text-gray-900 text-2xl font-bold">
+                {showBalances ? `${(balances?.bonus || 0).toLocaleString()} F` : '••••••'}
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-3">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-yellow-700 text-xs font-medium">Ce que vous pouvez retirer</span>
                 <span className="text-yellow-700 text-sm font-bold">
-                  {withdrawableBonus.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} F ({bonusPercentage}%)
+                  {withdrawableBonus.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} F
                 </span>
               </div>
-              {user?.level < 10 && (
-                <div className="text-green-600/70 text-[10px] mt-1">✅ 1% retirable à tout moment • 100% au niveau 10</div>
-              )}
+              <div className="text-yellow-600/70 text-[10px] leading-relaxed">
+                {user?.level >= 10 
+                  ? 'Votre bonus est 100% retirable car vous êtes au niveau 10 ou plus'
+                  : `Actuellement, ${bonusPercentage}% de votre bonus est retirable. Au niveau 10, vous pourrez retirer 100% de votre bonus.`
+                }
+              </div>
             </div>
 
             <button
               onClick={() => openWithdrawModal('bonus')}
               disabled={withdrawableBonus < 100}
-              className={`w-full py-3 rounded-xl font-semibold transition-colors shadow-md ${
+              className={`w-full py-3 rounded-xl font-semibold transition-colors text-sm ${
                 withdrawableBonus < 100
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-yellow-500 text-white hover:bg-yellow-600'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-yellow-500 text-white hover:bg-yellow-600 shadow-md'
               }`}
             >
-              {withdrawableBonus >= 100
-                ? `Retirer ${withdrawableBonus.toLocaleString()} F`
-                : 'Retirer'}
+              {withdrawableBonus >= 100 ? 'Retirer mon bonus' : 'Retirer'}
             </button>
           </div>
         </div>
 
-        {/* ==================== HISTORIQUE DES RETRAITS ==================== */}
+        {/* ==================== HISTORIQUE ==================== */}
         <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
-          <h2 className="text-gray-900 text-xl font-bold mb-6">Historique des Retraits</h2>
+          <div className="mb-2">
+            <h2 className="text-gray-900 text-xl font-bold">Historique des retraits</h2>
+            <p className="text-gray-400 text-xs">Toutes vos demandes de retrait passées</p>
+          </div>
+
           {loading ? (
             <div className="text-center py-8 text-gray-500">Chargement...</div>
           ) : withdrawals.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-3 mt-4">
               {withdrawals.map((w) => (
-                <div key={w.id} className="border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div key={w.id} className="border border-gray-200 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       {getStatusIcon(w.status)}
                       <div>
                         <div className="text-gray-900 text-sm font-semibold">{w.amount?.toLocaleString()} FCFA</div>
-                        <div className="text-gray-600 text-xs">
+                        <div className="text-gray-500 text-xs">
                           {w.type === 'gains' ? 'Bénéfices' : w.type === 'commissions' ? 'Commissions' : 'Bonus'} • {w.method || 'Mobile Money'}
                         </div>
                       </div>
@@ -416,19 +442,26 @@ export default function PortefeuillePage() {
                       {getStatusText(w.status)}
                     </div>
                   </div>
-                  <div className="text-gray-500 text-xs">
+                  <div className="text-gray-400 text-xs">
                     {new Date(w.requestedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </div>
                   {w.status === 'rejected' && w.rejectionReason && (
                     <div className="mt-2 text-red-600 text-xs">Raison : {w.rejectionReason}</div>
+                  )}
+                  {w.status === 'pending' && (
+                    <div className="mt-2 text-yellow-600 text-[10px]">Votre demande est en cours de traitement. Vous recevrez l&apos;argent sous 24 heures.</div>
+                  )}
+                  {w.status === 'completed' && (
+                    <div className="mt-2 text-green-600 text-[10px]">L&apos;argent a été envoyé sur votre compte</div>
                   )}
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <Download className="text-gray-400 mx-auto mb-3" size={48} />
-              <div className="text-gray-600 text-sm">Aucun retrait</div>
+              <Download className="text-gray-300 mx-auto mb-3" size={40} />
+              <div className="text-gray-900 font-semibold text-sm mb-1">Aucun retrait pour le moment</div>
+              <div className="text-gray-400 text-xs">Quand vous demanderez un retrait, il apparaîtra ici</div>
             </div>
           )}
         </div>
@@ -438,49 +471,46 @@ export default function PortefeuillePage() {
           <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white border border-gray-200 rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-gray-900 text-xl font-bold">
-                  Retirer {withdrawType === 'gains' ? 'Bénéfices' : withdrawType === 'commissions' ? 'Commissions' : 'Bonus'}
-                </h3>
-                <button onClick={() => setShowWithdrawModal(false)} className="text-gray-500 hover:text-gray-900">
-                  <X size={24} />
+                <div>
+                  <h3 className="text-gray-900 text-xl font-bold">
+                    Retirer {withdrawType === 'gains' ? 'vos bénéfices' : withdrawType === 'commissions' ? 'vos commissions' : 'votre bonus'}
+                  </h3>
+                  <p className="text-gray-400 text-xs mt-0.5">L&apos;argent sera envoyé sur votre compte Mobile Money</p>
+                </div>
+                <button onClick={() => setShowWithdrawModal(false)} className="text-gray-400 hover:text-gray-900">
+                  <X size={22} />
                 </button>
               </div>
 
+              {/* Solde */}
               <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
-                <div className="text-gray-600 text-xs mb-1">Solde disponible</div>
+                <div className="text-gray-500 text-xs mb-1">Montant disponible</div>
                 <div className="text-gray-900 text-2xl font-bold">
                   {Math.floor(withdrawType === 'gains'
                     ? totalBenefices
                     : withdrawType === 'commissions'
-                      ? (balances?.commissions || 0)
+                      ? commissions
                       : withdrawableBonus
                   ).toLocaleString()} FCFA
                 </div>
-                {withdrawType === 'gains' && liveEarnings > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-green-600 text-xs">
-                      dont +{liveEarnings.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F de gains live
-                    </span>
-                  </div>
+                {withdrawType === 'gains' && (
+                  <div className="text-gray-400 text-[10px] mt-1">Ce sont les bénéfices générés par vos investissements</div>
                 )}
                 {withdrawType === 'gains' && hasReferrer && (
-                  <div className="text-orange-500 text-xs mt-1">Net après 10% commission parrain</div>
+                  <div className="text-orange-500 text-[10px] mt-1">Net après 10% pour votre parrain</div>
                 )}
                 {withdrawType === 'commissions' && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-green-600 text-xs">10% des bénéfices de vos affiliés</span>
-                  </div>
+                  <div className="text-gray-400 text-[10px] mt-1">10% des gains de chaque personne que vous avez invitée</div>
                 )}
                 {withdrawType === 'bonus' && user?.level < 10 && (
-                  <div className="text-yellow-600 text-xs mt-1">1% du bonus total • 100% au niveau 10</div>
+                  <div className="text-yellow-600 text-[10px] mt-1">{bonusPercentage}% de votre bonus est retirable. 100% au niveau 10.</div>
                 )}
               </div>
 
+              {/* Formulaire */}
               <div className="space-y-4">
                 <div>
-                  <label className="text-gray-600 text-sm mb-2 block">Montant à retirer</label>
+                  <label className="text-gray-700 text-sm font-medium mb-1.5 block">Combien voulez-vous retirer ?</label>
                   <input
                     type="number"
                     value={withdrawAmount}
@@ -488,15 +518,15 @@ export default function PortefeuillePage() {
                     min={withdrawType === 'bonus' ? 100 : 1000}
                     step="1000"
                     placeholder={`Minimum ${withdrawType === 'bonus' ? '100' : '1,000'} FCFA`}
-                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-yellow-400 focus:outline-none"
+                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-gray-600 text-sm mb-2 block">Méthode de paiement</label>
+                  <label className="text-gray-700 text-sm font-medium mb-1.5 block">Comment voulez-vous recevoir l&apos;argent ?</label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-yellow-400 focus:outline-none"
+                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   >
                     <option value="mobile_money">Mobile Money</option>
                     <option value="wave">Wave</option>
@@ -506,41 +536,42 @@ export default function PortefeuillePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-gray-600 text-sm mb-2 block">
-                    {paymentMethod === 'bank_transfer' ? 'IBAN' : 'Numéro de téléphone'}
+                  <label className="text-gray-700 text-sm font-medium mb-1.5 block">
+                    {paymentMethod === 'bank_transfer' ? 'Numéro IBAN' : 'Numéro de téléphone'}
                   </label>
                   <input
                     type="text"
                     value={accountNumber}
                     onChange={(e) => setAccountNumber(e.target.value)}
-                    placeholder={paymentMethod === 'bank_transfer' ? 'CI00 0000 ...' : '+225 XX XX XX XX'}
-                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-yellow-400 focus:outline-none"
+                    placeholder={paymentMethod === 'bank_transfer' ? 'CI00 0000 ...' : '+225 07 00 00 00 00'}
+                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   />
+                  <p className="text-gray-400 text-[10px] mt-1">Le numéro sur lequel vous recevrez l&apos;argent</p>
                 </div>
                 <div>
-                  <label className="text-gray-600 text-sm mb-2 block">Nom complet</label>
+                  <label className="text-gray-700 text-sm font-medium mb-1.5 block">Nom complet du titulaire</label>
                   <input
                     type="text"
                     value={accountName}
                     onChange={(e) => setAccountName(e.target.value)}
-                    placeholder="Votre nom complet"
-                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-yellow-400 focus:outline-none"
+                    placeholder="Votre nom tel qu'il apparaît sur votre compte"
+                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   />
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                  <div className="text-blue-600 text-xs">⏱️ Délai : 24-48 heures</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div className="text-gray-600 text-xs">Vous recevrez l&apos;argent sur votre compte en moins de 24 heures</div>
                 </div>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowWithdrawModal(false)}
-                    className="flex-1 bg-gray-200 text-gray-900 py-3 rounded-xl font-semibold hover:bg-gray-300"
+                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-200 text-sm"
                   >
                     Annuler
                   </button>
                   <button
                     onClick={handleWithdraw}
                     disabled={isWithdrawing}
-                    className="flex-1 bg-yellow-400 text-white py-3 rounded-xl font-semibold hover:bg-yellow-500 disabled:opacity-50 shadow-md"
+                    className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-semibold hover:bg-gray-800 disabled:opacity-50 shadow-md text-sm"
                   >
                     {isWithdrawing ? 'En cours...' : `Retirer ${withdrawAmount ? parseFloat(withdrawAmount).toLocaleString() : ''} F`}
                   </button>

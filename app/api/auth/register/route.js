@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth';
-import { createNotification, NotificationTemplates } from '@/lib/notifications';
+import { createNotification, NotificationTemplates, sendWelcomeEmail } from '@/lib/notifications';
 
 export async function POST(request) {
   try {
@@ -19,10 +19,25 @@ export async function POST(request) {
     }
 
     // Vérifier si l'email existe déjà
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
       return NextResponse.json(
         { success: false, message: 'Cet email est déjà utilisé' },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier si le numéro de téléphone existe déjà
+    const cleanedPhone = phone.replace(/[\s\-\(\)]/g, '');
+    const existingPhone = await User.findOne({ 
+      $or: [
+        { phone: cleanedPhone },
+        { phone: '+' + cleanedPhone.replace(/^\+/, '') }
+      ]
+    });
+    if (existingPhone) {
+      return NextResponse.json(
+        { success: false, message: 'Ce numéro de téléphone est déjà utilisé' },
         { status: 400 }
       );
     }
@@ -47,10 +62,10 @@ export async function POST(request) {
       name,
       email: email.toLowerCase(),
       password,
-      phone,
+      phone: cleanedPhone,
       address: address || '',
       sponsorCode,
-      referralCode: sponsorCode, // Même code pour les deux champs
+      referralCode: sponsorCode,
       referredBy: referrer?._id || null,
       referredByCode: referralCode?.toUpperCase() || null,
       status: 'active',
@@ -60,35 +75,29 @@ export async function POST(request) {
       }
     });
 
-    // Ajouter aux filleuls du parrain
+    // Ajouter aux affiliés du parrain
     if (referrer) {
       await User.findByIdAndUpdate(referrer._id, {
         $push: { referrals: user._id }
       });
       
-      // 🔔 NOTIFICATION: Nouveau filleul inscrit
       await createNotification(
         referrer._id,
         NotificationTemplates.referralRegistered(name, referralCode.toUpperCase())
       );
     }
 
+    // ✉️ EMAIL: Bienvenue
+    sendWelcomeEmail(user.email, user.name).catch(console.error);
+
     // Générer les tokens
     const accessToken = generateAccessToken(user._id.toString(), user.role);
     const refreshToken = generateRefreshToken(user._id.toString());
-
-    console.log('🔑 Tokens générés:', {
-      accessToken: accessToken.substring(0, 30) + '...',
-      refreshToken: refreshToken.substring(0, 30) + '...',
-      userId: user._id.toString(),
-      userRole: user.role
-    });
 
     // Mettre à jour lastLogin
     user.lastLogin = new Date();
     await user.save();
 
-    // CRÉER LA RÉPONSE
     const response = NextResponse.json({
       success: true,
       message: 'Inscription réussie !',
@@ -106,14 +115,7 @@ export async function POST(request) {
       }
     }, { status: 201 });
 
-    // SET COOKIES VIA HEADERS
     const isProduction = process.env.NODE_ENV === 'production';
-    
-    console.log('🍪 Configuration cookies:', {
-      isProduction,
-      NODE_ENV: process.env.NODE_ENV,
-      secure: isProduction
-    });
     
     response.cookies.set('accessToken', accessToken, {
       httpOnly: true,
@@ -131,16 +133,20 @@ export async function POST(request) {
       path: '/'
     });
 
-    console.log('✅ Cookies ajoutés à la réponse:', response.cookies.getAll());
-
     return response;
 
   } catch (error) {
     console.error('❌ Register error:', error);
     
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      const msg = field === 'phone' 
+        ? 'Ce numéro de téléphone est déjà utilisé' 
+        : field === 'email'
+          ? 'Cet email est déjà utilisé'
+          : 'Ce compte existe déjà';
       return NextResponse.json(
-        { success: false, message: 'Cet email ou code parrain existe déjà' },
+        { success: false, message: msg },
         { status: 400 }
       );
     }

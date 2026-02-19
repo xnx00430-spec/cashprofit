@@ -9,20 +9,45 @@ export async function POST(request) {
 
     const { email, password } = await request.json();
 
-    // Validation
     if (!email || !password) {
       return NextResponse.json(
-        { success: false, message: 'Email et mot de passe requis' },
+        { success: false, message: 'Identifiant et mot de passe requis' },
         { status: 400 }
       );
     }
 
-    // Trouver l'utilisateur avec le password
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const input = email.trim();
+
+    // ========== FIX : Chercher par email OU par téléphone ==========
+    // Détecter si c'est un numéro de téléphone (commence par + ou chiffre)
+    const isPhone = /^[\+\d]/.test(input) && !input.includes('@');
+
+    let user;
+
+    if (isPhone) {
+      // Nettoyer le numéro : enlever espaces, tirets, parenthèses
+      let cleaned = input.replace(/[\s\-\(\)]/g, '');
+
+      // Chercher par phone exact OU avec variantes de préfixe
+      user = await User.findOne({
+        $or: [
+          { phone: cleaned },
+          { phone: '+' + cleaned },
+          // Si le user tape "0700000000", chercher aussi "+2250700000000"
+          { phone: { $regex: cleaned.replace(/^0/, ''), $options: 'i' } },
+          // Chercher aussi dans le faux email généré à l'inscription
+          { email: cleaned.replace(/\+/g, '') + '@invest.com' },
+          { email: '+' + cleaned.replace(/\+/g, '') + '@invest.com' },
+        ]
+      }).select('+password');
+    } else {
+      // Chercher par email classique
+      user = await User.findOne({ email: input.toLowerCase() }).select('+password');
+    }
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: 'Email ou mot de passe incorrect' },
+        { success: false, message: isPhone ? 'Numéro de téléphone ou mot de passe incorrect' : 'Email ou mot de passe incorrect' },
         { status: 401 }
       );
     }
@@ -32,7 +57,7 @@ export async function POST(request) {
 
     if (!isPasswordValid) {
       return NextResponse.json(
-        { success: false, message: 'Email ou mot de passe incorrect' },
+        { success: false, message: 'Identifiant ou mot de passe incorrect' },
         { status: 401 }
       );
     }
@@ -57,7 +82,6 @@ export async function POST(request) {
     user.lastLogin = new Date();
     await user.save();
 
-    // CRÉER LA RÉPONSE AVEC LES COOKIES DANS LES HEADERS
     const response = NextResponse.json({
       success: true,
       message: 'Connexion réussie',
@@ -86,7 +110,6 @@ export async function POST(request) {
       }
     }, { status: 200 });
 
-    // SET COOKIES VIA HEADERS
     const isProduction = process.env.NODE_ENV === 'production';
     
     response.cookies.set('accessToken', accessToken, {

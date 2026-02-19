@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import User from '@/models/User';
 import Investment from '@/models/Investment';
 import Opportunity from '@/models/Opportunity';
-import { createNotification, NotificationTemplates } from '@/lib/notifications';
+import { createNotification, NotificationTemplates, sendInvestmentEmail } from '@/lib/notifications';
 
 const REFERRAL_BONUS = 10000;
 const MAX_WEEKS = 52;
@@ -174,12 +174,19 @@ export async function POST(request) {
 
     console.log(`✅ Investment created: ${investment._id} - ${user.name} - ${investAmount} FCFA (${finalRate}%/sem)`);
 
-    // Notification investissement confirmé
+    // 🔔 Notification in-app investissement confirmé
     try {
       await createNotification(user._id,
         NotificationTemplates.investmentConfirmed(investAmount, opportunity.name)
       );
     } catch (e) { console.error('Notif error:', e); }
+
+    // ✉️ EMAIL: Investissement confirmé
+    sendInvestmentEmail(user.email, user.name, {
+      amount: investAmount,
+      opportunityName: opportunity.name,
+      rate: finalRate
+    }).catch(console.error);
 
     // ==================== GESTION PARRAIN ====================
     if (user.referredBy) {

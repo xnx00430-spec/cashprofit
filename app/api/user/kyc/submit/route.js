@@ -6,7 +6,6 @@ import { verifyAuth } from '@/lib/auth';
 import { createNotification, NotificationTemplates } from '@/lib/notifications';
 import { v2 as cloudinary } from 'cloudinary';
 
-// Configuration Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -25,20 +24,19 @@ export async function POST(request) {
 
     const formData = await request.formData();
     
-    // Récupérer les données du formulaire
     const fullName = formData.get('fullName');
     const birthDate = formData.get('birthDate');
     const idNumber = formData.get('idNumber');
     const nationality = formData.get('nationality');
     const address = formData.get('address');
     
-    // Récupérer les fichiers
     const idCardFront = formData.get('idCardFront');
-    const idCardBack = formData.get('idCardBack');
+    const idCardBackRaw = formData.get('idCardBack');
+    const idCardBack = (idCardBackRaw && typeof idCardBackRaw !== 'string' && idCardBackRaw.size > 0) ? idCardBackRaw : null;
     const selfie = formData.get('selfie');
-    const proofOfAddress = formData.get('proofOfAddress');
+    const proofOfAddressRaw = formData.get('proofOfAddress');
+    const proofOfAddress = (proofOfAddressRaw && typeof proofOfAddressRaw !== 'string' && proofOfAddressRaw.size > 0) ? proofOfAddressRaw : null;
 
-    // Validation
     if (!fullName || !birthDate || !idNumber || !nationality || !address) {
       return NextResponse.json(
         { success: false, message: 'Toutes les informations personnelles sont requises' },
@@ -46,9 +44,19 @@ export async function POST(request) {
       );
     }
 
-    if (!idCardFront || !idCardBack || !selfie) {
+    const docType = formData.get('docType') || 'cni';
+    const needsBack = docType !== 'passport';
+
+    if (!idCardFront || !selfie) {
       return NextResponse.json(
-        { success: false, message: 'Les 3 documents obligatoires sont requis (CNI recto, verso, selfie)' },
+        { success: false, message: 'Le recto du document et le selfie sont requis' },
+        { status: 400 }
+      );
+    }
+
+    if (needsBack && !idCardBack) {
+      return NextResponse.json(
+        { success: false, message: 'Le verso du document est requis' },
         { status: 400 }
       );
     }
@@ -80,11 +88,10 @@ export async function POST(request) {
 
     console.log('📤 Upload des documents vers Cloudinary...');
 
-    const [idFrontUrl, idBackUrl, selfieUrl, proofOfAddressUrl] = await Promise.all([
+    const [idFrontUrl, idBackUrl, selfieUrl] = await Promise.all([
       uploadToCloudinary(idCardFront, 'id-front'),
-      uploadToCloudinary(idCardBack, 'id-back'),
-      uploadToCloudinary(selfie, 'selfie'),
-      proofOfAddress ? uploadToCloudinary(proofOfAddress, 'proof-address') : Promise.resolve(null)
+      idCardBack ? uploadToCloudinary(idCardBack, 'id-back') : Promise.resolve(null),
+      uploadToCloudinary(selfie, 'selfie')
     ]);
 
     console.log('✅ Documents uploadés avec succès');
@@ -104,9 +111,11 @@ export async function POST(request) {
       });
     }
 
-    // ==================== SAUVEGARDER NOUVELLE SOUMISSION ====================
+    // ==================== AUTO-APPROVE IMMÉDIAT ====================
+    const now = new Date();
+    
     user.kyc = user.kyc || {};
-    user.kyc.status = 'pending';
+    user.kyc.status = 'approved';
     user.kyc.currentSubmission = {
       personalInfo: {
         fullName,
@@ -119,58 +128,35 @@ export async function POST(request) {
         idFront: idFrontUrl,
         idBack: idBackUrl,
         selfie: selfieUrl,
-        proofOfAddress: proofOfAddressUrl
+        proofOfAddress: null
       },
-      submittedAt: new Date(),
-      reviewedAt: null,
+      submittedAt: now,
+      reviewedAt: now,
       reviewedBy: null,
       adminMessage: null,
-      autoApprovedAt: null
+      autoApprovedAt: now
     };
 
     await user.save();
 
-    console.log('✅ KYC soumis, statut: pending');
+    console.log(`✅ KYC auto-approuvé pour ${user.name}`);
 
-    // ==================== AUTO-VALIDATION APRÈS 3 MINUTES ====================
-    setTimeout(async () => {
-      try {
-        await connectDB();
-        
-        const userToUpdate = await User.findById(user._id);
-        
-        // Vérifier que le KYC est toujours en pending (pas rejeté par admin entre temps)
-        if (userToUpdate && userToUpdate.kyc.status === 'pending') {
-          userToUpdate.kyc.status = 'approved';
-          if (!userToUpdate.kyc.currentSubmission) {
-            userToUpdate.kyc.currentSubmission = {};
-          }
-          userToUpdate.kyc.currentSubmission.autoApprovedAt = new Date();
-          userToUpdate.kyc.currentSubmission.reviewedAt = new Date();
-          await userToUpdate.save();
-
-          console.log(`✅ KYC auto-approuvé pour ${userToUpdate.firstName} ${userToUpdate.lastName}`);
-
-          // 🔔 NOTIFICATION: KYC approuvé
-          await createNotification(
-            userToUpdate._id,
-            NotificationTemplates.kycApproved()
-          );
-
-          console.log('✅ Notification KYC approuvé envoyée');
-        }
-      } catch (error) {
-        console.error('❌ Erreur auto-validation KYC:', error);
-      }
-    }, 3 * 60 * 1000); // 3 minutes
+    try {
+      await createNotification(
+        user._id,
+        NotificationTemplates.kycApproved()
+      );
+    } catch (e) {
+      console.error('Notification KYC error:', e);
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Documents KYC soumis avec succès. Validation automatique dans 3 minutes...',
+      message: 'Documents vérifiés avec succès !',
       kyc: {
-        status: 'pending',
-        submittedAt: user.kyc.currentSubmission.submittedAt,
-        estimatedApprovalTime: '3 minutes'
+        status: 'approved',
+        submittedAt: now,
+        approvedAt: now
       }
     });
 

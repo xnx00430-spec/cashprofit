@@ -62,17 +62,17 @@ export async function GET(request) {
       // Gains bruts totaux depuis le début
       const grossEarnings = weeklyEarning * activeWeeks;
       
-      // Gains déjà synchronisés en DB (déjà dans user.balance après un retrait)
+      // Gains déjà synchronisés en DB
       const lastSynced = inv.lastSyncedEarnings || 0;
       
-      // ========== CLÉ : gains PAS ENCORE en DB ==========
-      // C'est la partie "live" que le frontend ajoutera à user.balance
+      // Gains pas encore en DB (pour le sync au moment du retrait)
       const unsyncedGross = Math.max(grossEarnings - lastSynced, 0);
       const unsyncedNet = hasReferrer 
         ? unsyncedGross * (1 - REFERRER_CUT) 
         : unsyncedGross;
 
-      // Pour l'info : gains nets totaux (DB + live)
+      // ========== CLÉ : gains nets TOTAUX depuis le début ==========
+      // C'est ce que le frontend affiche comme "gains live"
       const totalNetEarnings = hasReferrer 
         ? grossEarnings * (1 - REFERRER_CUT) 
         : grossEarnings;
@@ -95,10 +95,10 @@ export async function GET(request) {
         startDate: inv.startDate,
         endDate: inv.endDate,
         status: inv.status,
-        // IMPORTANT : gains live PAS ENCORE en DB
-        currentEarnings: Math.round(unsyncedNet * 100) / 100,
-        // Info : gains nets totaux (pour affichage détaillé)
-        totalEarnings: Math.round(totalNetEarnings * 100) / 100,
+        // ========== GAINS NETS TOTAUX (ne repart jamais à 0) ==========
+        currentEarnings: Math.round(totalNetEarnings * 100) / 100,
+        // Gains non encore synchronisés en DB (pour usage interne)
+        unsyncedEarnings: Math.round(unsyncedNet * 100) / 100,
         grossEarnings: Math.round(grossEarnings * 100) / 100,
         referrerCut: hasReferrer ? Math.round(grossEarnings * REFERRER_CUT * 100) / 100 : 0,
         weeklyEarning: Math.round(weeklyEarning),
@@ -196,7 +196,6 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Calculs
     const baseRate = opportunity.baseRate;
     const bonus = user.getRateBonus();
     const finalRate = baseRate + bonus;
@@ -205,7 +204,6 @@ export async function POST(request) {
     const endDate = new Date(startDate.getTime() + maxWeeks * 7 * 24 * 60 * 60 * 1000);
     const isFirstInvestment = user.totalInvested === 0;
 
-    // Créer investissement
     const investment = await Investment.create({
       userId: user._id,
       opportunityId: opportunity._id,
@@ -219,16 +217,12 @@ export async function POST(request) {
       lastSyncedEarnings: 0
     });
 
-    // Mettre à jour user
     user.totalInvested += amount;
     user.activeInvestments += 1;
 
-    // Cagnotte : tous les investissements SAUF le premier comptent
     if (!isFirstInvestment) {
       user.currentLevelCagnotte = (user.currentLevelCagnotte || 0) + amount;
     }
-
-    // Le target est fixé au 1er investissement (pre-save hook) et ne change plus
 
     if (user.canLevelUp()) {
       const oldLevel = user.level;
@@ -240,7 +234,6 @@ export async function POST(request) {
       } catch (e) { console.error('Notif error:', e); }
     }
 
-    // ==================== GESTION PARRAIN ====================
     if (user.referredBy) {
       try {
         const sponsor = await User.findById(user.referredBy);

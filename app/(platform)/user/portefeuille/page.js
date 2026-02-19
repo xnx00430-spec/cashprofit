@@ -197,8 +197,8 @@ export default function PortefeuillePage() {
     rejected: <XCircle className="text-red-500" size={16} />
   }[s] || <AlertCircle className="text-gray-500" size={16} />);
   
-  const getStatusText = (s) => ({ pending: 'En attente', approved: 'En cours', completed: 'Reçu', rejected: 'Refusé' }[s] || s);
-  const getStatusColor = (s) => ({ pending: 'bg-yellow-50 text-yellow-600 border-yellow-200', approved: 'bg-blue-50 text-blue-600 border-blue-200', completed: 'bg-green-50 text-green-600 border-green-200', rejected: 'bg-red-50 text-red-600 border-red-200' }[s] || 'bg-gray-50 text-gray-600 border-gray-200');
+  const getStatusText = (s) => ({ pending: 'En cours', approved: 'Envoyé', completed: 'Envoyé', rejected: 'Refusé' }[s] || s);
+  const getStatusColor = (s) => ({ pending: 'bg-yellow-50 text-yellow-600 border-yellow-200', approved: 'bg-green-50 text-green-600 border-green-200', completed: 'bg-green-50 text-green-600 border-green-200', rejected: 'bg-red-50 text-red-600 border-red-200' }[s] || 'bg-gray-50 text-gray-600 border-gray-200');
 
   if (!mounted) return null;
 

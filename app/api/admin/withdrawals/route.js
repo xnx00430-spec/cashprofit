@@ -1,10 +1,13 @@
+// app/api/admin/withdrawals/[withdrawalId]/route.js
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Withdrawal from '@/models/Withdrawal';
+import User from '@/models/User';
 import { verifyAuth } from '@/lib/auth';
+import { createNotification, NotificationTemplates, sendWithdrawalCompletedEmail } from '@/lib/notifications';
 
-// GET - Liste tous les retraits (ADMIN ONLY)
-export async function GET(request) {
+// PUT - Approuver ou Rejeter un retrait (ADMIN ONLY)
+export async function PUT(request, context) {
   try {
     const payload = await verifyAuth();
     if (!payload || payload.role !== 'admin') {
@@ -14,98 +17,148 @@ export async function GET(request) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page')) || 1;
-    const limit = parseInt(searchParams.get('limit')) || 50;
-    const status = searchParams.get('status');
-    const type = searchParams.get('type');
-    const userId = searchParams.get('userId');
-    const skip = (page - 1) * limit;
+    // Next.js 15 : params doit être await
+    const { withdrawalId } = await context.params;
+
+    const { action, transactionId, reason, adminNotes } = await request.json();
+
+    if (!action || !['approve', 'reject', 'complete'].includes(action)) {
+      return NextResponse.json(
+        { success: false, message: 'Action invalide' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'reject' && !reason) {
+      return NextResponse.json(
+        { success: false, message: 'Raison de rejet requise' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'complete' && !transactionId) {
+      return NextResponse.json(
+        { success: false, message: 'ID de transaction requis' },
+        { status: 400 }
+      );
+    }
 
     await connectDB();
 
-    // Construire le filtre
-    const filter = {};
-    if (status) filter.status = status;
-    if (type) filter.type = type;
-    if (userId) filter.userId = userId;
+    const withdrawal = await Withdrawal.findById(withdrawalId);
+    if (!withdrawal) {
+      return NextResponse.json(
+        { success: false, message: 'Retrait non trouvé' },
+        { status: 404 }
+      );
+    }
 
-    // Récupérer les retraits
-    const withdrawals = await Withdrawal.find(filter)
-      .populate('userId', 'name email phone avatar')
-      .populate('processedBy', 'name')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // Vérifier que le retrait est en statut pending
+    if (action !== 'complete' && withdrawal.status !== 'pending') {
+      return NextResponse.json(
+        { success: false, message: 'Ce retrait ne peut plus être modifié' },
+        { status: 400 }
+      );
+    }
 
-    const total = await Withdrawal.countDocuments(filter);
+    // Récupérer le user
+    const user = await User.findById(withdrawal.userId).select('name email phone');
 
-    // Stats globales
-    const stats = await Withdrawal.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' }
+    // Appliquer l'action
+    switch (action) {
+      case 'approve':
+        // Simplification : approuver = compléter directement
+        await withdrawal.approve(payload.userId);
+        withdrawal.status = 'completed';
+        withdrawal.completedAt = new Date();
+        withdrawal.transactionId = transactionId || `CP-${Date.now()}`;
+        if (adminNotes) withdrawal.adminNotes = adminNotes;
+        await withdrawal.save();
+        
+        // 🔔 Notification in-app
+        try {
+          await createNotification(
+            withdrawal.userId,
+            NotificationTemplates.withdrawalCompleted(withdrawal.amount)
+          );
+        } catch (e) { console.error('Notif error:', e); }
+
+        // ✉️ EMAIL: Retrait complété (argent envoyé)
+        if (user?.email) {
+          sendWithdrawalCompletedEmail(user.email, user.name, {
+            amount: withdrawal.amount,
+            method: withdrawal.paymentMethod
+          }).catch(console.error);
         }
-      }
-    ]);
+        break;
 
-    // Montant total en attente
-    const pendingAmount = await Withdrawal.aggregate([
-      { $match: { status: 'pending' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
+      case 'reject':
+        await withdrawal.reject(payload.userId, reason);
+        if (adminNotes) withdrawal.adminNotes = adminNotes;
+        await withdrawal.save();
+        
+        // 🔔 Notification in-app
+        try {
+          await createNotification(
+            withdrawal.userId,
+            NotificationTemplates.withdrawalRejected(withdrawal.amount, reason)
+          );
+        } catch (e) { console.error('Notif error:', e); }
+        break;
+
+      case 'complete':
+        // Vérifier que le retrait est approuvé
+        if (withdrawal.status !== 'approved') {
+          return NextResponse.json(
+            { success: false, message: 'Le retrait doit être approuvé avant d\'être complété' },
+            { status: 400 }
+          );
+        }
+        
+        await withdrawal.complete(payload.userId, transactionId);
+        if (adminNotes) {
+          withdrawal.adminNotes = adminNotes;
+          await withdrawal.save();
+        }
+        
+        // 🔔 Notification in-app
+        try {
+          await createNotification(
+            withdrawal.userId,
+            NotificationTemplates.withdrawalCompleted(withdrawal.amount)
+          );
+        } catch (e) { console.error('Notif error:', e); }
+
+        // ✉️ EMAIL: Retrait complété (argent envoyé)
+        if (user?.email) {
+          sendWithdrawalCompletedEmail(user.email, user.name, {
+            amount: withdrawal.amount,
+            method: withdrawal.paymentMethod
+          }).catch(console.error);
+        }
+        break;
+    }
 
     return NextResponse.json({
       success: true,
-      withdrawals: withdrawals.map(w => ({
-        id: w._id,
-        user: w.userId,
-        amount: w.amount,
-        type: w.type,
-        status: w.status,
-        paymentMethod: w.paymentMethod,
-        accountNumber: w.accountNumber,
-        accountName: w.accountName,
-        transactionId: w.transactionId,
-        processedBy: w.processedBy,
-        rejectionReason: w.rejectionReason,
-        requestedAt: w.createdAt,
-        processedAt: w.processedAt,
-        completedAt: w.completedAt,
-        waitingDays: Math.floor((new Date() - new Date(w.createdAt)) / (24 * 60 * 60 * 1000))
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      },
-      stats: {
-        pending: {
-          count: stats.find(s => s._id === 'pending')?.count || 0,
-          amount: stats.find(s => s._id === 'pending')?.totalAmount || 0
-        },
-        approved: {
-          count: stats.find(s => s._id === 'approved')?.count || 0,
-          amount: stats.find(s => s._id === 'approved')?.totalAmount || 0
-        },
-        completed: {
-          count: stats.find(s => s._id === 'completed')?.count || 0,
-          amount: stats.find(s => s._id === 'completed')?.totalAmount || 0
-        },
-        rejected: {
-          count: stats.find(s => s._id === 'rejected')?.count || 0,
-          amount: stats.find(s => s._id === 'rejected')?.totalAmount || 0
-        },
-        totalPendingAmount: pendingAmount[0]?.total || 0
+      message: action === 'approve'
+        ? 'Retrait approuvé avec succès'
+        : action === 'reject'
+        ? 'Retrait rejeté'
+        : 'Retrait complété avec succès',
+      withdrawal: {
+        id: withdrawal._id,
+        status: withdrawal.status,
+        amount: withdrawal.amount,
+        user: user?.name,
+        processedAt: withdrawal.processedAt,
+        completedAt: withdrawal.completedAt,
+        transactionId: withdrawal.transactionId
       }
     });
 
   } catch (error) {
-    console.error('Admin get withdrawals error:', error);
+    console.error('Admin withdrawal action error:', error);
     return NextResponse.json(
       { success: false, message: 'Erreur serveur' },
       { status: 500 }

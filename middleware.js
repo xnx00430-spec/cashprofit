@@ -17,7 +17,16 @@ export async function middleware(request) {
     '/terms',
     '/privacy',
     '/legal/terms',
-    '/legal/privacy'
+    '/legal/privacy',
+    '/equipe',
+    '/blog',
+    '/sitemap.xml',
+  ];
+
+  // Routes publiques avec sous-pages (startsWith)
+  const publicPrefixes = [
+    '/blog/',
+    '/legal/',
   ];
 
   // Routes publiques (API)
@@ -25,12 +34,22 @@ export async function middleware(request) {
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/forgot-password',
-    '/api/payments/webhook',   // PawaPay callback (pas de cookie)
-    '/api/cron'                // Cron jobs
+    '/api/payments/webhook',
+    '/api/cron'
   ];
 
-  // Vérifier routes publiques
-  if (publicPaths.includes(pathname) || publicApiPaths.some(path => pathname.startsWith(path))) {
+  // Vérifier routes publiques exactes
+  if (publicPaths.includes(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Vérifier routes publiques avec préfixes (blog/slug, etc.)
+  if (publicPrefixes.some(prefix => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
+
+  // Vérifier API publiques
+  if (publicApiPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 

@@ -110,7 +110,7 @@ export default function TermsPage() {
 
           <h2 className="text-2xl font-bold text-gray-900 mt-10 mb-4">Article 16 — Contact</h2>
           <p className="text-gray-600 leading-relaxed">Pour toute question relative aux présentes Conditions Générales d'Utilisation, vous pouvez nous contacter :</p>
-          <p className="text-gray-600 leading-relaxed"><strong>Email :</strong> support@cashprofit.fr</p>
+          <p className="text-gray-600 leading-relaxed"><strong>Email :</strong> support@cashprofit.net</p>
           <p className="text-gray-600 leading-relaxed"><strong>WhatsApp :</strong> Disponible via le bouton de support sur la Plateforme</p>
           <p className="text-gray-600 leading-relaxed"><strong>Horaires :</strong> Du lundi au samedi, de 9h00 à 18h00 (GMT)</p>
 

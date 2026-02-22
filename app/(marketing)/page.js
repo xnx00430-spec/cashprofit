@@ -6,10 +6,12 @@ import ReferralProgram from './components/home/ReferralProgram';
 import SecuritySection from './components/home/SecuritySection';
 import CTASection from './components/home/CTASection';
 import Testimonials from './components/home/Testimonials';
+import Demo from './components/home/Demo';
 export default function HomePage() {
   return (
     <>
       <HeroSection />
+      <Demo/>
       <Testimonials/>
       <HowItWorks />
       <LevelsShowcase />

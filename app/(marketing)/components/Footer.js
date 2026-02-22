@@ -8,7 +8,6 @@ export default function Footer() {
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           
-          {/* Brand */}
           <div className="md:col-span-1">
             <div className="text-2xl font-black text-white mb-4">
               Cash<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">Profit</span>
@@ -22,7 +21,6 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Navigation */}
           <div>
             <h4 className="text-white font-bold mb-5">Navigation</h4>
             <div className="space-y-3">
@@ -30,10 +28,11 @@ export default function Footer() {
               <a href="#niveaux" className="block text-gray-500 hover:text-white text-sm transition-colors">Niveaux</a>
               <a href="#parrainage" className="block text-gray-500 hover:text-white text-sm transition-colors">Parrainage</a>
               <a href="#securite" className="block text-gray-500 hover:text-white text-sm transition-colors">Sécurité</a>
+              <Link href="/equipe" className="block text-gray-500 hover:text-white text-sm transition-colors">Notre équipe</Link>
+              <Link href="/blog" className="block text-gray-500 hover:text-white text-sm transition-colors">Blog</Link>
             </div>
           </div>
 
-          {/* Compte */}
           <div>
             <h4 className="text-white font-bold mb-5">Compte</h4>
             <div className="space-y-3">
@@ -42,31 +41,22 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Contact */}
           <div>
             <h4 className="text-white font-bold mb-5">Support</h4>
             <div className="space-y-3">
-              <a href="mailto:support@cashprofit.fr" className="block text-gray-500 hover:text-white text-sm transition-colors">
-                support@cashprofit.fr
-              </a>
-              <a href="https://wa.me/47XXXXXXXXXXXX" target="_blank" rel="noopener noreferrer" className="block text-gray-500 hover:text-white text-sm transition-colors">
-                WhatsApp Support
-              </a>
-              <p className="text-gray-600 text-xs mt-4">
-                Lun-Sam • 9h-18h (GMT)
-              </p>
+              <a href="mailto:support@cashprofit.fr" className="block text-gray-500 hover:text-white text-sm transition-colors">support@cashprofit.fr</a>
+              <a href="https://wa.me/47XXXXXXXXXXXX" target="_blank" rel="noopener noreferrer" className="block text-gray-500 hover:text-white text-sm transition-colors">WhatsApp Support</a>
+              <p className="text-gray-600 text-xs mt-4">Lun-Sam • 9h-18h (GMT)</p>
             </div>
           </div>
         </div>
 
-        {/* Bottom */}
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-gray-600 text-sm">
-            © {new Date().getFullYear()} CashProfit. Tous droits réservés.
-          </p>
+          <p className="text-gray-600 text-sm">© {new Date().getFullYear()} CashProfit. Tous droits réservés.</p>
           <div className="flex items-center gap-6">
             <Link href="/legal/terms" className="text-gray-600 hover:text-gray-400 text-sm transition-colors">CGU</Link>
             <Link href="/legal/privacy" className="text-gray-600 hover:text-gray-400 text-sm transition-colors">Confidentialité</Link>
+            <Link href="/equipe" className="text-gray-600 hover:text-gray-400 text-sm transition-colors">Équipe</Link>
           </div>
         </div>
       </div>

@@ -2,11 +2,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   TrendingUp, X, Users, CheckCircle
 } from 'lucide-react';
+import KkiapayButton from '@/components/KkiapayButton';
+import CryptoPaymentModal from '@/components/CryptoPaymentModal';
 
 export default function InvestirPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [opportunities, setOpportunities] = useState([]);
@@ -18,6 +22,11 @@ export default function InvestirPage() {
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [investAmount, setInvestAmount] = useState('');
   const [isInvesting, setIsInvesting] = useState(false);
+  const [payError, setPayError] = useState(null);
+  const [paySuccess, setPaySuccess] = useState(false);
+
+  // Crypto
+  const [showCryptoModal, setShowCryptoModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -55,40 +64,31 @@ export default function InvestirPage() {
   const openInvestModal = (opp) => {
     setSelectedOpp(opp);
     setInvestAmount('');
+    setPayError(null);
+    setPaySuccess(false);
     setShowInvestModal(true);
   };
 
-  const handlePay = async () => {
-    const amount = Number(investAmount);
-    const min = selectedOpp.minInvestment || 1000;
-    const max = selectedOpp.maxInvestment || 10000000;
-    if (!amount || amount < min) {
-      alert(`Le montant minimum est de ${min.toLocaleString()} FCFA`);
-      return;
-    }
-    if (amount > max) {
-      alert(`Le montant maximum est de ${max.toLocaleString()} FCFA`);
-      return;
-    }
-    setIsInvesting(true);
-    try {
-      const res = await fetch('/api/payments/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opportunityId: selectedOpp.id, amount })
-      });
-      const data = await res.json();
-      if (data.success && data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else {
-        alert(data.message || 'Erreur lors du paiement');
-      }
-    } catch (error) {
-      console.error('Erreur paiement:', error);
-      alert('Erreur lors du paiement. Veuillez réessayer.');
-    } finally {
-      setIsInvesting(false);
-    }
+  const handlePaySuccess = (data) => {
+    setPaySuccess(true);
+    setIsInvesting(false);
+    setTimeout(() => {
+      fetchData();
+      setShowInvestModal(false);
+      setPaySuccess(false);
+      router.push('/user');
+    }, 2000);
+  };
+
+  const handlePayError = (msg) => {
+    setPayError(msg);
+    setIsInvesting(false);
+  };
+
+  const handleCryptoSuccess = () => {
+    setShowCryptoModal(false);
+    fetchData();
+    router.push('/user');
   };
 
   const calculateProjection = () => {
@@ -104,8 +104,6 @@ export default function InvestirPage() {
   if (!mounted) return null;
 
   const totalEarnings = getTotalEarnings();
-  // Fix: balance contient déjà les gains sync - retraits
-  // On ajoute seulement unsyncedEarnings pour avoir le total réel
   const unsyncedEarnings = investments.reduce((sum, inv) => sum + (inv.unsyncedEarnings || 0), 0);
   const totalBenefices = (user?.balance || 0) + unsyncedEarnings;
   const totalBalance = (user?.totalInvested || 0) + totalBenefices + (user?.totalCommissions || 0) + (user?.bonusParrainage || 0);
@@ -122,7 +120,6 @@ export default function InvestirPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          
           <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-6 relative overflow-hidden shadow-lg">
             <div className="absolute top-4 right-4 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -147,9 +144,7 @@ export default function InvestirPage() {
           <div className="bg-white/70 backdrop-blur-xl border border-gray-200 rounded-2xl p-4 shadow-md">
             <div className="text-gray-600 text-xs mb-1">Solde total</div>
             <div className="text-gray-400 text-[10px] mb-1">Tout votre argent</div>
-            <div className="text-gray-900 text-2xl font-bold">
-              {Math.floor(totalBalance).toLocaleString('fr-FR')} F
-            </div>
+            <div className="text-gray-900 text-2xl font-bold">{Math.floor(totalBalance).toLocaleString('fr-FR')} F</div>
           </div>
           
           <div className="bg-white/70 backdrop-blur-xl border border-gray-200 rounded-2xl p-4 shadow-md">
@@ -192,8 +187,6 @@ export default function InvestirPage() {
                       <h3 className="text-gray-900 text-xl font-bold mb-2">{opp.name}</h3>
                       <p className="text-gray-500 text-sm line-clamp-2">{opp.description}</p>
                     </div>
-
-                    {/* Taux */}
                     <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-3">
                       <div className="flex items-baseline justify-between mb-1">
                         <div>
@@ -208,13 +201,9 @@ export default function InvestirPage() {
                         Exemple : 100,000 F investis = {exampleGain.toLocaleString()} F de gains par semaine
                       </div>
                     </div>
-
-                    {/* Garantie */}
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
                       <div className="text-blue-700 text-[10px] leading-relaxed">{opp.guaranteeMessage}</div>
                     </div>
-
-                    {/* Stats */}
                     <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
                       <div className="flex items-center gap-1">
                         <Users size={12} />
@@ -222,7 +211,6 @@ export default function InvestirPage() {
                       </div>
                       <div>À partir de {opp.minInvestment?.toLocaleString()} F</div>
                     </div>
-
                     <button className="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 rounded-xl text-sm font-bold transition-colors">
                       Investir maintenant
                     </button>
@@ -231,13 +219,12 @@ export default function InvestirPage() {
               })}
             </div>
 
-            {/* Bloc explicatif */}
             <div className="mt-8 bg-gray-50 border border-gray-200 rounded-2xl p-5">
               <h3 className="text-gray-900 text-sm font-bold mb-3">Comment ça marche ?</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600">
                 <div>
                   <div className="text-gray-900 font-semibold mb-1">1. Choisissez un montant</div>
-                  <div>À partir de 10,000 FCFA. Vous payez avec votre Mobile Money (Orange, MTN, Wave, Moov). Aucun frais.</div>
+                  <div>À partir de 10,000 FCFA. Vous payez avec votre Mobile Money (Orange, MTN, Wave, Moov), carte bancaire ou crypto USDT. Aucun frais.</div>
                 </div>
                 <div>
                   <div className="text-gray-900 font-semibold mb-1">2. Vos gains commencent tout de suite</div>
@@ -262,108 +249,153 @@ export default function InvestirPage() {
           <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white border border-gray-200 rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               
-              {/* Header */}
               <div className="flex items-start justify-between mb-6">
                 <div className="flex-1">
                   <h2 className="text-gray-900 text-2xl font-bold mb-1">{selectedOpp.name}</h2>
                   <p className="text-gray-500 text-sm">{selectedOpp.description}</p>
                 </div>
-                <button onClick={() => setShowInvestModal(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
+                <button onClick={() => { setShowInvestModal(false); setPayError(null); setPaySuccess(false); }} className="text-gray-400 hover:text-gray-900 transition-colors">
                   <X size={22} />
                 </button>
               </div>
 
-              {/* Taux */}
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-5">
-                <div className="text-gray-600 text-sm mb-2">Ce que vous gagnez chaque semaine</div>
-                <div className="flex items-baseline gap-3 mb-2">
-                  <span className="text-green-600 text-5xl font-bold">{selectedOpp.finalRate}%</span>
-                  <span className="text-gray-500 text-lg">de votre investissement</span>
+              {/* Succès */}
+              {paySuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-5 text-center">
+                  <CheckCircle className="text-green-500 mx-auto mb-3" size={48} />
+                  <div className="text-green-700 text-xl font-bold mb-1">Investissement réussi !</div>
+                  <div className="text-green-600 text-sm">Vos gains commencent maintenant. Redirection...</div>
                 </div>
-                {selectedOpp.bonus > 0 && (
-                  <div className="text-yellow-600 text-sm">Dont +{selectedOpp.bonus}% grâce à votre niveau {user?.level || 1}</div>
-                )}
-                <div className="text-green-600/60 text-xs mt-2">
-                  Exemple : 100,000 F investis = {Math.round(100000 * selectedOpp.finalRate / 100).toLocaleString()} F de gains par semaine
-                </div>
-              </div>
+              )}
 
-              {/* Garantie */}
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5">
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
-                  <div className="text-blue-700 text-sm leading-relaxed">{selectedOpp.guaranteeMessage}</div>
+              {/* Erreur */}
+              {payError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
+                  <div className="text-red-600 text-sm">{payError}</div>
+                  <button onClick={() => setPayError(null)} className="text-red-400 text-xs mt-1 underline">Fermer</button>
                 </div>
-              </div>
+              )}
 
-              {/* Formulaire */}
-              <div className="border border-gray-200 rounded-2xl p-6">
-                <h3 className="text-gray-900 font-bold mb-1">Combien voulez-vous investir ?</h3>
-                <p className="text-gray-400 text-xs mb-4">Entrez le montant en FCFA. Plus vous investissez, plus vous gagnez.</p>
-                
-                <div className="mb-4">
-                  <input type="number" value={investAmount} onChange={(e) => setInvestAmount(e.target.value)}
-                    placeholder="Ex: 50000" min={selectedOpp.minInvestment || 1000} step="1000"
-                    className="w-full bg-white border border-gray-300 text-gray-900 text-2xl font-bold rounded-xl px-4 py-4 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none placeholder:text-gray-400 placeholder:text-base placeholder:font-normal" />
-                  <div className="text-gray-400 text-xs mt-2">
-                    Minimum : {(selectedOpp.minInvestment || 1000).toLocaleString()} F • Maximum : {(selectedOpp.maxInvestment || 10000000).toLocaleString()} F
-                  </div>
-                </div>
-
-                {/* Projection */}
-                {Number(investAmount) > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
-                    <div className="text-gray-700 text-xs mb-1">Ce que vous allez gagner chaque semaine</div>
-                    <div className="text-gray-900 text-3xl font-bold">+{calculateProjection().toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA</div>
-                    <div className="text-gray-500 text-xs mt-1">
-                      {hasReferrer ? 'Net après 10% pour la personne qui vous a invité' : 'Bénéfice net que vous pouvez retirer ou réinvestir'}
+              {!paySuccess && (
+                <>
+                  {/* Taux */}
+                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-5">
+                    <div className="text-gray-600 text-sm mb-2">Ce que vous gagnez chaque semaine</div>
+                    <div className="flex items-baseline gap-3 mb-2">
+                      <span className="text-green-600 text-5xl font-bold">{selectedOpp.finalRate}%</span>
+                      <span className="text-gray-500 text-lg">de votre investissement</span>
                     </div>
-                    {hasReferrer && (
-                      <div className="text-orange-500 text-[10px] mt-2">
-                        Total brut : {(Number(investAmount) * (selectedOpp.finalRate / 100)).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} F — {(Number(investAmount) * (selectedOpp.finalRate / 100) * 0.10).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} F vont à votre parrain
+                    {selectedOpp.bonus > 0 && (
+                      <div className="text-yellow-600 text-sm">Dont +{selectedOpp.bonus}% grâce à votre niveau {user?.level || 1}</div>
+                    )}
+                  </div>
+
+                  {/* Garantie */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                      <div className="text-blue-700 text-sm leading-relaxed">{selectedOpp.guaranteeMessage}</div>
+                    </div>
+                  </div>
+
+                  {/* Formulaire */}
+                  <div className="border border-gray-200 rounded-2xl p-6">
+                    <h3 className="text-gray-900 font-bold mb-1">Combien voulez-vous investir ?</h3>
+                    <p className="text-gray-400 text-xs mb-4">Entrez le montant en FCFA. Plus vous investissez, plus vous gagnez.</p>
+                    
+                    <div className="mb-4">
+                      <input type="number" value={investAmount} onChange={(e) => { setInvestAmount(e.target.value); setPayError(null); }}
+                        placeholder="Ex: 50000" min={selectedOpp.minInvestment || 1000} step="1000"
+                        className="w-full bg-white border border-gray-300 text-gray-900 text-2xl font-bold rounded-xl px-4 py-4 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none placeholder:text-gray-400 placeholder:text-base placeholder:font-normal" />
+                      <div className="text-gray-400 text-xs mt-2">
+                        Minimum : {(selectedOpp.minInvestment || 1000).toLocaleString()} F • Maximum : {(selectedOpp.maxInvestment || 10000000).toLocaleString()} F
+                      </div>
+                    </div>
+
+                    {Number(investAmount) > 0 && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                        <div className="text-gray-700 text-xs mb-1">Ce que vous allez gagner chaque semaine</div>
+                        <div className="text-gray-900 text-3xl font-bold">+{calculateProjection().toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA</div>
+                        <div className="text-gray-500 text-xs mt-1">
+                          {hasReferrer ? 'Net après 10% pour la personne qui vous a invité' : 'Bénéfice net que vous pouvez retirer ou réinvestir'}
+                        </div>
+                        {hasReferrer && (
+                          <div className="text-orange-500 text-[10px] mt-2">
+                            Total brut : {(Number(investAmount) * (selectedOpp.finalRate / 100)).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} F — {(Number(investAmount) * (selectedOpp.finalRate / 100) * 0.10).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} F vont à votre parrain
+                          </div>
+                        )}
+                        <div className="mt-3 pt-3 border-t border-yellow-200">
+                          <div className="text-gray-500 text-[10px] mb-1">Si vous laissez votre investissement pendant 1 mois :</div>
+                          <div className="text-gray-900 text-sm font-bold">
+                            Environ +{(calculateProjection() * 4).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA de gains
+                          </div>
+                        </div>
                       </div>
                     )}
 
-                    {/* Projection 1 mois */}
-                    <div className="mt-3 pt-3 border-t border-yellow-200">
-                      <div className="text-gray-500 text-[10px] mb-1">Si vous laissez votre investissement pendant 1 mois :</div>
-                      <div className="text-gray-900 text-sm font-bold">
-                        Environ +{(calculateProjection() * 4).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA de gains
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4">
+                      <div className="text-gray-600 text-xs leading-relaxed">
+                        <strong>Paiement :</strong> choisissez votre méthode ci-dessous. Mobile Money / carte bancaire (instantané) ou Crypto USDT (validation manuelle sous 24h).
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Info */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4">
-                  <div className="text-gray-600 text-xs leading-relaxed">
-                    <strong>Comment ça marche :</strong> votre argent reste investi et génère des gains automatiquement, chaque seconde. Vous pouvez retirer vos bénéfices quand vous voulez à partir de 1,000 FCFA. Votre capital reste en place et continue à travailler pour vous.
-                  </div>
-                </div>
+                    {/* Boutons de paiement */}
+                    <div className="space-y-3">
+                      <div className="flex gap-3">
+                        <button onClick={() => { setShowInvestModal(false); setPayError(null); }}
+                          className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm">
+                          Annuler
+                        </button>
+                        <KkiapayButton
+                          amount={Number(investAmount)}
+                          opportunityId={selectedOpp.id}
+                          opportunityName={selectedOpp.name}
+                          customerName={user?.name || ''}
+                          customerEmail={user?.email || ''}
+                          customerPhone={user?.phone || ''}
+                          onSuccess={handlePaySuccess}
+                          onError={handlePayError}
+                          onLoading={(loading) => setIsInvesting(loading)}
+                          disabled={isInvesting || !investAmount || Number(investAmount) < (selectedOpp.minInvestment || 1000)}
+                          className="flex-1 bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-sm"
+                        >
+                          {isInvesting ? 'Vérification en cours...' : investAmount ? `Payer ${Number(investAmount).toLocaleString()} FCFA` : 'Entrez un montant'}
+                        </KkiapayButton>
+                      </div>
 
-                {/* Paiement info */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-5">
-                  <div className="text-gray-600 text-xs leading-relaxed">
-                    <strong>Paiement :</strong> vous serez redirigé vers la page de paiement Mobile Money. Le montant sera débité de votre compte et votre investissement sera activé immédiatement après confirmation.
+                      {/* Bouton Crypto */}
+                      <button
+                        onClick={() => {
+                          setShowInvestModal(false);
+                          setShowCryptoModal(true);
+                        }}
+                        disabled={!investAmount || Number(investAmount) < (selectedOpp.minInvestment || 1000)}
+                        className="w-full bg-white border-2 border-yellow-400 text-yellow-700 font-bold py-4 rounded-xl hover:bg-yellow-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                          <path d="M12 17h.01" />
+                        </svg>
+                        Payer par Crypto (USDT)
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                {/* Boutons */}
-                <div className="flex gap-3">
-                  <button onClick={() => setShowInvestModal(false)}
-                    className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm">
-                    Annuler
-                  </button>
-                  <button onClick={handlePay}
-                    disabled={isInvesting || !investAmount || Number(investAmount) < (selectedOpp.minInvestment || 1000)}
-                    className="flex-1 bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-sm">
-                    {isInvesting ? 'Redirection vers le paiement...' : investAmount ? `Payer ${Number(investAmount).toLocaleString()} FCFA` : 'Entrez un montant'}
-                  </button>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
         )}
+
+        {/* ==================== MODAL CRYPTO ==================== */}
+        <CryptoPaymentModal
+          isOpen={showCryptoModal}
+          onClose={() => setShowCryptoModal(false)}
+          amount={Number(investAmount)}
+          opportunityId={selectedOpp?.id}
+          opportunityName={selectedOpp?.name}
+          onSuccess={handleCryptoSuccess}
+        />
       </div>
     </div>
   );

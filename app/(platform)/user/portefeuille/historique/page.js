@@ -92,6 +92,23 @@ export default function HistoriquePage() {
     }
   };
 
+  const getMethodLabel = (w) => {
+    if (w.paymentMethod === 'crypto_usdt' || w.method === 'crypto_usdt') {
+      return `USDT ${w.cryptoNetwork || ''}`;
+    }
+    const labels = {
+      mobile_money: 'Mobile Money',
+      wave: 'Wave',
+      orange_money: 'Orange Money',
+      mtn_money: 'MTN Money',
+      moov_money: 'Moov Money',
+      bank_transfer: 'Virement',
+    };
+    return labels[w.method || w.paymentMethod] || w.method || 'Mobile Money';
+  };
+
+  const isCrypto = (w) => (w.paymentMethod === 'crypto_usdt' || w.method === 'crypto_usdt');
+
   if (!mounted) return null;
 
   return (
@@ -188,7 +205,12 @@ export default function HistoriquePage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="md:hidden text-gray-500 text-xs">Montant :</span>
-                      <span className="text-gray-900 text-sm font-semibold">{w.amount.toLocaleString()} F</span>
+                      <div>
+                        <span className="text-gray-900 text-sm font-semibold">{w.amount.toLocaleString()} F</span>
+                        {isCrypto(w) && w.estimatedUSDT && (
+                          <div className="text-blue-500 text-[10px] font-medium">~{w.estimatedUSDT} USDT</div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="md:hidden text-gray-500 text-xs">Type :</span>
@@ -196,7 +218,14 @@ export default function HistoriquePage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="md:hidden text-gray-500 text-xs">Méthode :</span>
-                      <span className="text-gray-600 text-sm">{w.method || 'Mobile Money'}</span>
+                      <div>
+                        <span className="text-gray-600 text-sm">{getMethodLabel(w)}</span>
+                        {isCrypto(w) && w.cryptoAddress && (
+                          <div className="text-gray-400 text-[10px] font-mono truncate max-w-[120px]" title={w.cryptoAddress}>
+                            {w.cryptoAddress.slice(0, 8)}...{w.cryptoAddress.slice(-6)}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="md:hidden text-gray-500 text-xs">Statut :</span>
@@ -213,7 +242,15 @@ export default function HistoriquePage() {
                       )}
                       {(w.status === 'completed' || w.status === 'approved') && (
                         <div className="text-green-600 text-xs">
-                          Envoyé sur votre {w.method || 'Mobile Money'}
+                          {isCrypto(w) 
+                            ? 'USDT envoyés sur votre wallet' 
+                            : `Envoyé sur votre ${getMethodLabel(w)}`
+                          }
+                          {isCrypto(w) && w.txHash && (
+                            <div className="text-blue-500 text-[10px] font-mono mt-0.5 truncate max-w-[150px]" title={w.txHash}>
+                              TX: {w.txHash}
+                            </div>
+                          )}
                         </div>
                       )}
                       {w.status === 'pending' && (

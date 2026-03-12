@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Wallet, TrendingUp, Users, Gift, 
   ArrowUpRight, Eye, EyeOff, Clock,
-  CheckCircle, XCircle, AlertCircle, Download, Lock, X
+  CheckCircle, XCircle, AlertCircle, Download, Lock, X, Copy, Check
 } from 'lucide-react';
 
 function Modal({ show, type, title, message, onClose, onConfirm, confirmText, cancelText }) {
@@ -49,6 +49,9 @@ function Modal({ show, type, title, message, onClose, onConfirm, confirmText, ca
   );
 }
 
+// Taux de conversion FCFA → USDT (approximatif, à ajuster)
+const FCFA_TO_USDT_RATE = 600; // 1 USDT ≈ 600 FCFA
+
 export default function PortefeuillePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -68,8 +71,15 @@ export default function PortefeuillePage() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, confirmText: '', cancelText: '' });
 
-  const showModal = (type, title, message, opts = {}) => setModal({ show: true, type, title, message, ...opts });
+  // Crypto-specific fields
+  const [cryptoNetwork, setCryptoNetwork] = useState('TRC20');
+  const [cryptoAddress, setCryptoAddress] = useState('');
+  const [addressCopied, setAddressCopied] = useState(false);
+
+  const showModalFn = (type, title, message, opts = {}) => setModal({ show: true, type, title, message, ...opts });
   const hideModal = () => setModal({ ...modal, show: false, onConfirm: null });
+
+  const isCrypto = paymentMethod === 'crypto_usdt';
 
   useEffect(() => {
     setMounted(true);
@@ -116,77 +126,122 @@ export default function PortefeuillePage() {
     return user.level >= 10 ? balances.bonus : balances.bonus * 0.01;
   };
 
+  const getEstimatedUSDT = () => {
+    if (!withdrawAmount || isNaN(withdrawAmount)) return 0;
+    return (parseFloat(withdrawAmount) / FCFA_TO_USDT_RATE).toFixed(2);
+  };
+
+  // Validation basique d'une adresse crypto
+  const isValidCryptoAddress = (address, network) => {
+    if (!address || address.length < 20) return false;
+    if (network === 'TRC20' && !address.startsWith('T')) return false;
+    if (network === 'BEP20' && !address.startsWith('0x')) return false;
+    if (network === 'ERC20' && !address.startsWith('0x')) return false;
+    return true;
+  };
+
   const handleWithdraw = async () => {
     const minAmount = withdrawType === 'bonus' ? 100 : 1000;
     if (!withdrawAmount || withdrawAmount < minAmount) {
-      showModal('error', 'Montant trop bas', `Le minimum pour retirer est de ${minAmount.toLocaleString()} FCFA`);
+      showModalFn('error', 'Montant trop bas', `Le minimum pour retirer est de ${minAmount.toLocaleString()} FCFA`);
       return;
     }
-    if (!accountNumber || !accountName) {
-      showModal('error', 'Informations manquantes', 'Entrez votre numéro de téléphone et votre nom complet pour recevoir l\'argent');
-      return;
+
+    // Validation crypto
+    if (isCrypto) {
+      if (!cryptoAddress) {
+        showModalFn('error', 'Adresse manquante', 'Entrez votre adresse de wallet USDT');
+        return;
+      }
+      if (!isValidCryptoAddress(cryptoAddress, cryptoNetwork)) {
+        showModalFn('error', 'Adresse invalide', `L'adresse ne semble pas être une adresse ${cryptoNetwork} valide.\n\n${cryptoNetwork === 'TRC20' ? 'Une adresse TRC20 commence par "T"' : 'Une adresse BEP20/ERC20 commence par "0x"'}`);
+        return;
+      }
+    } else {
+      if (!accountNumber || !accountName) {
+        showModalFn('error', 'Informations manquantes', 'Entrez votre numéro de téléphone et votre nom complet pour recevoir l\'argent');
+        return;
+      }
     }
+
     if (withdrawType === 'bonus') {
       const maxBonus = getWithdrawableBonus();
       if (parseFloat(withdrawAmount) > maxBonus) {
-        showModal('warning', 'Montant trop élevé', `Vous pouvez retirer maximum ${maxBonus.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} FCFA (${user.level >= 10 ? '100%' : '1%'} de votre bonus)`);
+        showModalFn('warning', 'Montant trop élevé', `Vous pouvez retirer maximum ${maxBonus.toLocaleString('fr-FR', { minimumFractionDigits: 0 })} FCFA (${user.level >= 10 ? '100%' : '1%'} de votre bonus)`);
         return;
       }
     }
     if (withdrawType === 'commissions') {
       const maxComm = balances?.commissions || 0;
       if (parseFloat(withdrawAmount) > maxComm) {
-        showModal('warning', 'Montant trop élevé', `Vous avez ${maxComm.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA de commissions disponibles`);
+        showModalFn('warning', 'Montant trop élevé', `Vous avez ${maxComm.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} FCFA de commissions disponibles`);
         return;
       }
     }
 
     setIsWithdrawing(true);
     try {
+      const body = {
+        amount: parseFloat(withdrawAmount),
+        type: withdrawType,
+        paymentMethod,
+        accountNumber: isCrypto ? cryptoAddress : accountNumber,
+        accountName: isCrypto ? `Wallet ${cryptoNetwork}` : accountName,
+      };
+
+      // Ajouter les champs crypto
+      if (isCrypto) {
+        body.cryptoNetwork = cryptoNetwork;
+        body.cryptoAddress = cryptoAddress;
+        body.estimatedUSDT = parseFloat(getEstimatedUSDT());
+      }
+
       const res = await fetch('/api/user/withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: parseFloat(withdrawAmount),
-          type: withdrawType,
-          paymentMethod,
-          accountNumber,
-          accountName
-        })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data.success) {
-        showModal('success', 'Retrait demandé', `Votre demande de ${parseFloat(withdrawAmount).toLocaleString()} FCFA a été enregistrée.\n\nVous recevrez l'argent sur votre compte en moins de 24 heures.`);
+        const methodText = isCrypto 
+          ? `en USDT (${cryptoNetwork}) sur votre wallet` 
+          : 'sur votre compte';
+        showModalFn('success', 'Retrait demandé', `Votre demande de ${parseFloat(withdrawAmount).toLocaleString()} FCFA a été enregistrée.\n\n${isCrypto ? `Estimation : ~${getEstimatedUSDT()} USDT\n\n` : ''}Vous recevrez l'argent ${methodText} en moins de 24 heures.`);
         setShowWithdrawModal(false);
-        setWithdrawAmount('');
-        setAccountNumber('');
-        setAccountName('');
+        resetWithdrawForm();
         fetchAllData();
       } else {
         if (data.needsKYC) {
-          showModal('confirm', 'Vérification d\'identité requise', 'Pour retirer de l\'argent, vous devez d\'abord vérifier votre identité. C\'est rapide et automatique.', {
+          showModalFn('confirm', 'Vérification d\'identité requise', 'Pour retirer de l\'argent, vous devez d\'abord vérifier votre identité. C\'est rapide et automatique.', {
             onConfirm: () => { hideModal(); router.push('/user/profil/kyc'); },
             confirmText: 'Vérifier maintenant',
             cancelText: 'Plus tard'
           });
         } else if (data.blocked) {
-          showModal('error', 'Gains bloqués', `${data.message}\n\nVos commissions restent disponibles : ${(data.details?.commissionsAvailable || 0).toLocaleString()} FCFA`);
+          showModalFn('error', 'Gains bloqués', `${data.message}\n\nVos commissions restent disponibles : ${(data.details?.commissionsAvailable || 0).toLocaleString()} FCFA`);
         } else {
-          showModal('error', 'Erreur', data.message || 'Une erreur est survenue');
+          showModalFn('error', 'Erreur', data.message || 'Une erreur est survenue');
         }
       }
     } catch (error) {
-      showModal('error', 'Erreur réseau', 'Impossible de contacter le serveur. Vérifiez votre connexion internet.');
+      showModalFn('error', 'Erreur réseau', 'Impossible de contacter le serveur. Vérifiez votre connexion internet.');
     } finally {
       setIsWithdrawing(false);
     }
   };
 
-  const openWithdrawModal = (type) => {
-    setWithdrawType(type);
+  const resetWithdrawForm = () => {
     setWithdrawAmount('');
     setAccountNumber('');
     setAccountName('');
+    setCryptoAddress('');
+    setCryptoNetwork('TRC20');
+    setPaymentMethod('mobile_money');
+  };
+
+  const openWithdrawModal = (type) => {
+    setWithdrawType(type);
+    resetWithdrawForm();
     setShowWithdrawModal(true);
   };
 
@@ -199,6 +254,19 @@ export default function PortefeuillePage() {
   
   const getStatusText = (s) => ({ pending: 'En cours', approved: 'Envoyé', completed: 'Envoyé', rejected: 'Refusé' }[s] || s);
   const getStatusColor = (s) => ({ pending: 'bg-yellow-50 text-yellow-600 border-yellow-200', approved: 'bg-green-50 text-green-600 border-green-200', completed: 'bg-green-50 text-green-600 border-green-200', rejected: 'bg-red-50 text-red-600 border-red-200' }[s] || 'bg-gray-50 text-gray-600 border-gray-200');
+
+  const getMethodLabel = (method) => {
+    const labels = {
+      mobile_money: 'Mobile Money',
+      wave: 'Wave',
+      orange_money: 'Orange Money',
+      mtn_money: 'MTN Money',
+      moov_money: 'Moov Money',
+      bank_transfer: 'Virement bancaire',
+      crypto_usdt: 'Crypto USDT'
+    };
+    return labels[method] || method;
+  };
 
   if (!mounted) return null;
 
@@ -288,9 +356,7 @@ export default function PortefeuillePage() {
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
                 <div className="flex items-start gap-2">
                   <Lock className="text-red-500 flex-shrink-0 mt-0.5" size={14} />
-                  <div className="text-red-600 text-xs">
-                    Bloqués — Invitez des personnes pour débloquer
-                  </div>
+                  <div className="text-red-600 text-xs">Bloqués — Invitez des personnes pour débloquer</div>
                 </div>
               </div>
             )}
@@ -310,11 +376,7 @@ export default function PortefeuillePage() {
                   : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
               }`}
             >
-              {user?.benefitsBlocked
-                ? 'Bloqué — Invitez pour débloquer'
-                : totalBenefices >= 1000
-                  ? `Retirer mes bénéfices`
-                  : 'Retirer'}
+              {user?.benefitsBlocked ? 'Bloqué — Invitez pour débloquer' : totalBenefices >= 1000 ? `Retirer mes bénéfices` : 'Retirer'}
             </button>
           </div>
 
@@ -434,8 +496,13 @@ export default function PortefeuillePage() {
                       <div>
                         <div className="text-gray-900 text-sm font-semibold">{w.amount?.toLocaleString()} FCFA</div>
                         <div className="text-gray-500 text-xs">
-                          {w.type === 'gains' ? 'Bénéfices' : w.type === 'commissions' ? 'Commissions' : 'Bonus'} • {w.method || 'Mobile Money'}
+                          {w.type === 'gains' ? 'Bénéfices' : w.type === 'commissions' ? 'Commissions' : 'Bonus'} • {getMethodLabel(w.method || w.paymentMethod)}
                         </div>
+                        {w.paymentMethod === 'crypto_usdt' && w.cryptoNetwork && (
+                          <div className="text-blue-500 text-[10px] font-medium mt-0.5">
+                            USDT {w.cryptoNetwork} {w.estimatedUSDT ? `• ~${w.estimatedUSDT} USDT` : ''}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className={`px-3 py-1 rounded-lg text-xs font-medium border ${getStatusColor(w.status)}`}>
@@ -452,7 +519,12 @@ export default function PortefeuillePage() {
                     <div className="mt-2 text-yellow-600 text-[10px]">Votre demande est en cours de traitement. Vous recevrez l&apos;argent sous 24 heures.</div>
                   )}
                   {w.status === 'completed' && (
-                    <div className="mt-2 text-green-600 text-[10px]">L&apos;argent a été envoyé sur votre compte</div>
+                    <div className="mt-2 text-green-600 text-[10px]">
+                      {w.paymentMethod === 'crypto_usdt' ? 'Les USDT ont été envoyés sur votre wallet' : 'L\'argent a été envoyé sur votre compte'}
+                      {w.txHash && (
+                        <span className="block text-blue-500 text-[10px] font-mono mt-0.5">TX: {w.txHash}</span>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -475,7 +547,7 @@ export default function PortefeuillePage() {
                   <h3 className="text-gray-900 text-xl font-bold">
                     Retirer {withdrawType === 'gains' ? 'vos bénéfices' : withdrawType === 'commissions' ? 'vos commissions' : 'votre bonus'}
                   </h3>
-                  <p className="text-gray-400 text-xs mt-0.5">L&apos;argent sera envoyé sur votre compte Mobile Money</p>
+                  <p className="text-gray-400 text-xs mt-0.5">Choisissez votre méthode de retrait</p>
                 </div>
                 <button onClick={() => setShowWithdrawModal(false)} className="text-gray-400 hover:text-gray-900">
                   <X size={22} />
@@ -509,6 +581,7 @@ export default function PortefeuillePage() {
 
               {/* Formulaire */}
               <div className="space-y-4">
+                {/* Montant */}
                 <div>
                   <label className="text-gray-700 text-sm font-medium mb-1.5 block">Combien voulez-vous retirer ?</label>
                   <input
@@ -521,6 +594,8 @@ export default function PortefeuillePage() {
                     className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   />
                 </div>
+
+                {/* Méthode de paiement */}
                 <div>
                   <label className="text-gray-700 text-sm font-medium mb-1.5 block">Comment voulez-vous recevoir l&apos;argent ?</label>
                   <select
@@ -528,39 +603,131 @@ export default function PortefeuillePage() {
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   >
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="wave">Wave</option>
-                    <option value="orange_money">Orange Money</option>
-                    <option value="mtn_money">MTN Money</option>
-                    <option value="bank_transfer">Virement bancaire</option>
+                    <optgroup label="Mobile Money">
+                      <option value="mobile_money">Mobile Money</option>
+                      <option value="wave">Wave</option>
+                      <option value="orange_money">Orange Money</option>
+                      <option value="mtn_money">MTN Money</option>
+                    </optgroup>
+                    <optgroup label="Virement">
+                      <option value="bank_transfer">Virement bancaire</option>
+                    </optgroup>
+                    <optgroup label="Crypto">
+                      <option value="crypto_usdt">USDT (Crypto)</option>
+                    </optgroup>
                   </select>
                 </div>
-                <div>
-                  <label className="text-gray-700 text-sm font-medium mb-1.5 block">
-                    {paymentMethod === 'bank_transfer' ? 'Numéro IBAN' : 'Numéro de téléphone'}
-                  </label>
-                  <input
-                    type="text"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    placeholder={paymentMethod === 'bank_transfer' ? 'CI00 0000 ...' : '+225 07 00 00 00 00'}
-                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
-                  />
-                  <p className="text-gray-400 text-[10px] mt-1">Le numéro sur lequel vous recevrez l&apos;argent</p>
-                </div>
-                <div>
-                  <label className="text-gray-700 text-sm font-medium mb-1.5 block">Nom complet du titulaire</label>
-                  <input
-                    type="text"
-                    value={accountName}
-                    onChange={(e) => setAccountName(e.target.value)}
-                    placeholder="Votre nom tel qu'il apparaît sur votre compte"
-                    className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
-                  />
-                </div>
+
+                {/* ==================== CHAMPS CRYPTO ==================== */}
+                {isCrypto && (
+                  <>
+                    {/* Estimation USDT */}
+                    {withdrawAmount && parseFloat(withdrawAmount) > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-blue-700 text-xs font-medium">Estimation en USDT</span>
+                          <span className="text-blue-700 text-lg font-bold font-mono">~{getEstimatedUSDT()} USDT</span>
+                        </div>
+                        <div className="text-blue-500 text-[10px] mt-1">
+                          Taux indicatif : 1 USDT ≈ {FCFA_TO_USDT_RATE} FCFA. Le montant exact sera calculé au moment du traitement.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Réseau */}
+                    <div>
+                      <label className="text-gray-700 text-sm font-medium mb-1.5 block">Réseau USDT</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { value: 'TRC20', label: 'TRC20', desc: 'Tron', color: 'red' },
+                          { value: 'BEP20', label: 'BEP20', desc: 'BSC', color: 'yellow' },
+                          { value: 'ERC20', label: 'ERC20', desc: 'Ethereum', color: 'blue' },
+                        ].map((net) => (
+                          <button
+                            key={net.value}
+                            type="button"
+                            onClick={() => setCryptoNetwork(net.value)}
+                            className={`p-3 rounded-xl border-2 text-center transition-all ${
+                              cryptoNetwork === net.value
+                                ? 'border-gray-900 bg-gray-900 text-white'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-400'
+                            }`}
+                          >
+                            <div className="text-sm font-bold">{net.label}</div>
+                            <div className={`text-[10px] ${cryptoNetwork === net.value ? 'text-gray-300' : 'text-gray-400'}`}>{net.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                        <div className="text-yellow-700 text-[10px] font-medium flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          Vérifiez bien le réseau ! Envoyer sur le mauvais réseau = perte des fonds.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Adresse wallet */}
+                    <div>
+                      <label className="text-gray-700 text-sm font-medium mb-1.5 block">Votre adresse de wallet USDT ({cryptoNetwork})</label>
+                      <input
+                        type="text"
+                        value={cryptoAddress}
+                        onChange={(e) => setCryptoAddress(e.target.value.trim())}
+                        placeholder={cryptoNetwork === 'TRC20' ? 'T...' : '0x...'}
+                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm font-mono"
+                      />
+                      <p className="text-gray-400 text-[10px] mt-1">
+                        Collez l&apos;adresse exacte de votre wallet. Vérifiez-la 2 fois avant de valider.
+                      </p>
+                      {cryptoAddress && !isValidCryptoAddress(cryptoAddress, cryptoNetwork) && (
+                        <p className="text-red-500 text-[10px] mt-1">
+                          Cette adresse ne semble pas valide pour le réseau {cryptoNetwork}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* ==================== CHAMPS MOBILE MONEY / BANK ==================== */}
+                {!isCrypto && (
+                  <>
+                    <div>
+                      <label className="text-gray-700 text-sm font-medium mb-1.5 block">
+                        {paymentMethod === 'bank_transfer' ? 'Numéro IBAN' : 'Numéro de téléphone'}
+                      </label>
+                      <input
+                        type="text"
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder={paymentMethod === 'bank_transfer' ? 'CI00 0000 ...' : '+225 07 00 00 00 00'}
+                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
+                      />
+                      <p className="text-gray-400 text-[10px] mt-1">Le numéro sur lequel vous recevrez l&apos;argent</p>
+                    </div>
+                    <div>
+                      <label className="text-gray-700 text-sm font-medium mb-1.5 block">Nom complet du titulaire</label>
+                      <input
+                        type="text"
+                        value={accountName}
+                        onChange={(e) => setAccountName(e.target.value)}
+                        placeholder="Votre nom tel qu'il apparaît sur votre compte"
+                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Info délai */}
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                  <div className="text-gray-600 text-xs">Vous recevrez l&apos;argent sur votre compte en moins de 24 heures</div>
+                  <div className="text-gray-600 text-xs">
+                    {isCrypto 
+                      ? 'Les USDT seront envoyés sur votre wallet en moins de 24 heures après validation'
+                      : 'Vous recevrez l\'argent sur votre compte en moins de 24 heures'
+                    }
+                  </div>
                 </div>
+
+                {/* Boutons */}
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowWithdrawModal(false)}
@@ -570,10 +737,15 @@ export default function PortefeuillePage() {
                   </button>
                   <button
                     onClick={handleWithdraw}
-                    disabled={isWithdrawing}
+                    disabled={isWithdrawing || (isCrypto && !isValidCryptoAddress(cryptoAddress, cryptoNetwork))}
                     className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-semibold hover:bg-gray-800 disabled:opacity-50 shadow-md text-sm"
                   >
-                    {isWithdrawing ? 'En cours...' : `Retirer ${withdrawAmount ? parseFloat(withdrawAmount).toLocaleString() : ''} F`}
+                    {isWithdrawing 
+                      ? 'En cours...' 
+                      : withdrawAmount 
+                        ? `Retirer ${parseFloat(withdrawAmount).toLocaleString()} F${isCrypto ? ` (~${getEstimatedUSDT()} USDT)` : ''}`
+                        : 'Retirer'
+                    }
                   </button>
                 </div>
               </div>

@@ -13,6 +13,7 @@
     "check-levels": "node scripts/check-level-progression.js"
   },
   "dependencies": {
+    "@kkiapay-org/nodejs-sdk": "^1.0.7",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
     "cookie": "^1.1.1",

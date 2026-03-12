@@ -135,10 +135,20 @@ export async function GET(request) {
         type: w.type,
         status: w.status,
         method: w.paymentMethod,
+        paymentMethod: w.paymentMethod,
         accountNumber: w.accountNumber,
+        accountName: w.accountName,
+        // Champs crypto
+        cryptoNetwork: w.cryptoNetwork || null,
+        cryptoAddress: w.cryptoAddress || null,
+        estimatedUSDT: w.estimatedUSDT || null,
+        txHash: w.txHash || null,
+        // Dates
         requestedAt: w.createdAt,
         processedAt: w.processedAt,
-        rejectionReason: w.rejectionReason
+        completedAt: w.completedAt,
+        rejectionReason: w.rejectionReason,
+        transactionId: w.transactionId
       })),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
       stats: {
@@ -169,7 +179,13 @@ export async function POST(request) {
       );
     }
 
-    const { amount, type, paymentMethod, accountNumber, accountName } = await request.json();
+    const { 
+      amount, type, paymentMethod, accountNumber, accountName,
+      // Nouveaux champs crypto
+      cryptoNetwork, cryptoAddress, estimatedUSDT 
+    } = await request.json();
+
+    const isCrypto = paymentMethod === 'crypto_usdt';
 
     const minAmount = type === 'bonus' ? 100 : 1000;
     if (!amount || amount < minAmount) {
@@ -186,11 +202,42 @@ export async function POST(request) {
       );
     }
 
-    if (!paymentMethod || !accountNumber || !accountName) {
-      return NextResponse.json(
-        { success: false, message: 'Informations de paiement manquantes' },
-        { status: 400 }
-      );
+    // Validation selon la méthode
+    if (isCrypto) {
+      // Validation crypto
+      if (!cryptoAddress || cryptoAddress.length < 20) {
+        return NextResponse.json(
+          { success: false, message: 'Adresse de wallet crypto invalide' },
+          { status: 400 }
+        );
+      }
+      if (!cryptoNetwork || !['TRC20', 'BEP20', 'ERC20'].includes(cryptoNetwork)) {
+        return NextResponse.json(
+          { success: false, message: 'Réseau crypto invalide. Choisissez TRC20, BEP20 ou ERC20.' },
+          { status: 400 }
+        );
+      }
+      // Validation basique du format
+      if (cryptoNetwork === 'TRC20' && !cryptoAddress.startsWith('T')) {
+        return NextResponse.json(
+          { success: false, message: 'Adresse TRC20 invalide (doit commencer par T)' },
+          { status: 400 }
+        );
+      }
+      if ((cryptoNetwork === 'BEP20' || cryptoNetwork === 'ERC20') && !cryptoAddress.startsWith('0x')) {
+        return NextResponse.json(
+          { success: false, message: `Adresse ${cryptoNetwork} invalide (doit commencer par 0x)` },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Validation Mobile Money / Bank
+      if (!paymentMethod || !accountNumber || !accountName) {
+        return NextResponse.json(
+          { success: false, message: 'Informations de paiement manquantes' },
+          { status: 400 }
+        );
+      }
     }
 
     await connectDB();
@@ -286,19 +333,30 @@ export async function POST(request) {
     await user.save();
 
     // ==================== CRÉER LE RETRAIT ====================
-    const withdrawal = await Withdrawal.create({
+    const withdrawalData = {
       userId: user._id,
       amount,
       type,
       paymentMethod,
-      accountNumber,
-      accountName,
+      accountNumber: isCrypto ? cryptoAddress : accountNumber,
+      accountName: isCrypto ? `Wallet ${cryptoNetwork}` : accountName,
       status: 'pending'
-    });
+    };
+
+    // Ajouter les champs crypto si applicable
+    if (isCrypto) {
+      withdrawalData.cryptoNetwork = cryptoNetwork;
+      withdrawalData.cryptoAddress = cryptoAddress;
+      withdrawalData.estimatedUSDT = estimatedUSDT || null;
+    }
+
+    const withdrawal = await Withdrawal.create(withdrawalData);
 
     // 🔔 Notification in-app
     const typeLabel = type === 'gains' ? 'Bénéfices' :
                      type === 'commissions' ? 'Commissions' : 'Bonus';
+    const methodLabel = isCrypto ? `Crypto USDT (${cryptoNetwork})` : paymentMethod;
+    
     try {
       await createNotification(
         user._id,
@@ -312,7 +370,7 @@ export async function POST(request) {
     sendWithdrawalRequestedEmail(user.email, user.name, {
       amount,
       type: typeLabel,
-      method: paymentMethod
+      method: methodLabel
     }).catch(console.error);
 
     return NextResponse.json({
@@ -323,7 +381,10 @@ export async function POST(request) {
         amount: withdrawal.amount,
         type: withdrawal.type,
         status: withdrawal.status,
-        estimatedProcessingTime: '24-48 heures',
+        paymentMethod: withdrawal.paymentMethod,
+        cryptoNetwork: withdrawal.cryptoNetwork || null,
+        estimatedUSDT: withdrawal.estimatedUSDT || null,
+        estimatedProcessingTime: isCrypto ? '24 heures' : '24-48 heures',
         createdAt: withdrawal.createdAt
       }
     }, { status: 201 });

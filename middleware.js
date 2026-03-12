@@ -12,6 +12,7 @@ export async function middleware(request) {
     '/auth/login',
     '/auth/register',
     '/auth/forgot-password',
+    '/auth/reset-password',
     '/about',
     '/contact',
     '/terms',
@@ -34,6 +35,7 @@ export async function middleware(request) {
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/forgot-password',
+    '/api/auth/reset-password',
     '/api/payments/webhook',
     '/api/cron'
   ];

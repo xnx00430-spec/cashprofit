@@ -199,6 +199,14 @@ const UserSchema = new mongoose.Schema({
     }]
   },
   
+  // ==================== RESET PASSWORD ====================
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
+  },
+  
   // Authentification
   lastLogin: {
     type: Date,
@@ -229,7 +237,6 @@ UserSchema.pre('save', async function() {
 // Initialiser le défi au premier investissement
 UserSchema.pre('save', function() {
   if (this.totalInvested > 0 && !this.currentLevelStartDate) {
-    // Premier investissement : fixer le target pour TOUS les niveaux
     this.firstInvestmentAmount = this.totalInvested;
     this.currentLevelStartDate = new Date();
     const weeks = this.level === 1 ? 3 : 2;
@@ -258,39 +265,32 @@ UserSchema.statics.generateSponsorCode = async function() {
   return code;
 };
 
-// Taux bonus selon le niveau
-// Niveau 1 = 0%, Niveau 2 = +5%, Niveau 3-20 = +10%
 UserSchema.methods.getRateBonus = function() {
   if (this.level === 1) return 0;
   if (this.level === 2) return 5;
-  return 10; // Niveau 3 à 20
+  return 10;
 };
 
-// Vérifier si peut passer au niveau suivant
 UserSchema.methods.canLevelUp = function() {
   if (this.level >= 20) return false;
   return this.currentLevelCagnotte >= this.currentLevelTarget;
 };
 
-// Passer au niveau suivant
 UserSchema.methods.levelUp = function() {
   if (this.level >= 20) return;
   this.level += 1;
   this.currentLevelCagnotte = 0;
   this.currentLevelStartDate = new Date();
   this.currentLevelDeadline = new Date(Date.now() + 2 * 7 * 24 * 60 * 60 * 1000);
-  // Target toujours basé sur le 1er investissement
   this.currentLevelTarget = (this.firstInvestmentAmount || this.totalInvested) * 5;
   this.benefitsBlocked = false;
 };
 
-// Deadline dépassée ?
 UserSchema.methods.isDeadlinePassed = function() {
   if (!this.currentLevelDeadline) return false;
   return new Date() > this.currentLevelDeadline;
 };
 
-// Échouer le défi
 UserSchema.methods.failChallenge = function() {
   this.benefitsBlocked = true;
   this.currentLevelDeadline = new Date(Date.now() + 2 * 7 * 24 * 60 * 60 * 1000);

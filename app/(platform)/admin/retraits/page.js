@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Search, CheckCircle, X, Clock, DollarSign, Calendar, Eye, Check } from 'lucide-react';
+import { Search, CheckCircle, X, Clock, DollarSign, Calendar, Eye, Check, Copy } from 'lucide-react';
 
 export default function AdminWithdrawals() {
   const [loading, setLoading] = useState(true);
@@ -11,6 +11,7 @@ export default function AdminWithdrawals() {
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchWithdrawals();
@@ -40,6 +41,12 @@ export default function AdminWithdrawals() {
   });
 
   const formatNumber = (num) => new Intl.NumberFormat('fr-FR').format(num);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const getStatusColor = (status) => {
     switch(status) {
@@ -77,6 +84,19 @@ export default function AdminWithdrawals() {
       case 'bonus': return 'text-yellow-600';
       default: return 'text-gray-600';
     }
+  };
+
+  const getMethodLabel = (method) => {
+    const labels = {
+      mobile_money: 'Mobile Money',
+      wave: 'Wave',
+      orange_money: 'Orange Money',
+      mtn_money: 'MTN Money',
+      moov_money: 'Moov Money',
+      bank_transfer: 'Virement',
+      crypto_usdt: 'Crypto USDT'
+    };
+    return labels[method] || method;
   };
 
   const toggleSelection = (id) => {
@@ -136,14 +156,19 @@ export default function AdminWithdrawals() {
   };
 
   const handleMarkCompleted = async (id) => {
-    const transactionId = prompt('ID de transaction (optionnel):');
+    const w = selectedWithdrawal || withdrawals.find(w => w.id === id);
+    const isCrypto = w?.paymentMethod === 'crypto_usdt';
+    const transactionId = prompt(isCrypto ? 'Hash de la transaction crypto (TX Hash):' : 'ID de transaction (optionnel):');
     const confirmed = confirm('Marquer ce retrait comme complété ?');
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/admin/withdrawals/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'complete', transactionId: transactionId || `TRX-${Date.now()}` })
+        body: JSON.stringify({ 
+          action: 'complete', 
+          transactionId: transactionId || `TRX-${Date.now()}` 
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -162,7 +187,6 @@ export default function AdminWithdrawals() {
     if (selectedIds.length === 0) return;
     const confirmed = confirm(`Approuver ${selectedIds.length} retrait(s) ?`);
     if (!confirmed) return;
-    // Approuver un par un
     let success = 0;
     for (const id of selectedIds) {
       try {
@@ -206,6 +230,7 @@ export default function AdminWithdrawals() {
   const totalApproved = withdrawals.filter(w => w.status === 'approved').reduce((acc, w) => acc + w.amount, 0);
   const totalCompleted = withdrawals.filter(w => w.status === 'completed').reduce((acc, w) => acc + w.amount, 0);
   const pendingCount = withdrawals.filter(w => w.status === 'pending').length;
+  const cryptoPending = withdrawals.filter(w => w.status === 'pending' && w.paymentMethod === 'crypto_usdt').length;
 
   if (loading) {
     return (
@@ -220,7 +245,7 @@ export default function AdminWithdrawals() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-gray-900 mb-2">Gestion des Retraits</h1>
-          <p className="text-gray-600">{withdrawals.length} demande(s) au total</p>
+          <p className="text-gray-600">{withdrawals.length} demande(s) au total {cryptoPending > 0 && <span className="text-blue-600 font-semibold">• {cryptoPending} crypto en attente</span>}</p>
         </div>
 
         {/* Stats */}
@@ -340,6 +365,9 @@ export default function AdminWithdrawals() {
                       </td>
                       <td className="p-4">
                         <div className="text-gray-900 font-black">{formatNumber(w.amount)} F</div>
+                        {w.paymentMethod === 'crypto_usdt' && w.estimatedUSDT && (
+                          <div className="text-blue-500 text-xs font-medium">~{w.estimatedUSDT} USDT</div>
+                        )}
                       </td>
                       <td className="p-4">
                         <span className={`text-xs font-medium ${getTypeColor(w.type)}`}>
@@ -347,11 +375,27 @@ export default function AdminWithdrawals() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className="text-gray-700 text-sm">{w.paymentMethod || 'Mobile Money'}</div>
+                        <div className="text-gray-700 text-sm">{getMethodLabel(w.paymentMethod)}</div>
+                        {w.paymentMethod === 'crypto_usdt' && w.cryptoNetwork && (
+                          <div className="text-blue-500 text-[10px] font-bold">{w.cryptoNetwork}</div>
+                        )}
                       </td>
                       <td className="p-4">
-                        <div className="text-gray-700 text-sm font-mono">{w.accountNumber || '-'}</div>
-                        <div className="text-gray-500 text-xs">{w.accountName || ''}</div>
+                        {w.paymentMethod === 'crypto_usdt' && w.cryptoAddress ? (
+                          <div className="flex items-center gap-1">
+                            <div className="text-gray-700 text-xs font-mono truncate max-w-[120px]" title={w.cryptoAddress}>
+                              {w.cryptoAddress}
+                            </div>
+                            <button onClick={() => copyToClipboard(w.cryptoAddress)} className="text-gray-400 hover:text-gray-700 flex-shrink-0">
+                              <Copy size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="text-gray-700 text-sm font-mono">{w.accountNumber || '-'}</div>
+                            <div className="text-gray-500 text-xs">{w.accountName || ''}</div>
+                          </>
+                        )}
                       </td>
                       <td className="p-4">
                         <div className="text-gray-700 flex items-center gap-2 text-sm">
@@ -385,7 +429,7 @@ export default function AdminWithdrawals() {
         {/* Modal Détails */}
         {showModal && selectedWithdrawal && (
           <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white border border-gray-200 rounded-3xl max-w-lg w-full shadow-2xl">
+            <div className="bg-white border border-gray-200 rounded-3xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-black text-gray-900">Détails du retrait</h2>
@@ -408,6 +452,9 @@ export default function AdminWithdrawals() {
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                     <div className="text-gray-600 text-sm mb-1">Montant</div>
                     <div className="text-gray-900 text-xl font-black">{formatNumber(selectedWithdrawal.amount)} F</div>
+                    {selectedWithdrawal.paymentMethod === 'crypto_usdt' && selectedWithdrawal.estimatedUSDT && (
+                      <div className="text-blue-500 text-sm font-medium mt-1">~{selectedWithdrawal.estimatedUSDT} USDT</div>
+                    )}
                   </div>
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                     <div className="text-gray-600 text-sm mb-1">Type</div>
@@ -417,25 +464,71 @@ export default function AdminWithdrawals() {
                   </div>
                 </div>
 
+                {/* Informations de paiement */}
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                   <div className="text-gray-600 text-sm mb-2">Informations de paiement</div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Méthode:</span>
-                      <span className="text-gray-900 font-semibold">{selectedWithdrawal.paymentMethod || 'Mobile Money'}</span>
+                      <span className="text-gray-900 font-semibold">{getMethodLabel(selectedWithdrawal.paymentMethod)}</span>
                     </div>
-                    {selectedWithdrawal.accountNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Numéro:</span>
-                        <span className="text-gray-900 font-semibold font-mono">{selectedWithdrawal.accountNumber}</span>
-                      </div>
+
+                    {/* Détails crypto */}
+                    {selectedWithdrawal.paymentMethod === 'crypto_usdt' ? (
+                      <>
+                        {selectedWithdrawal.cryptoNetwork && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Réseau:</span>
+                            <span className="text-blue-600 font-bold">{selectedWithdrawal.cryptoNetwork}</span>
+                          </div>
+                        )}
+                        {selectedWithdrawal.cryptoAddress && (
+                          <div>
+                            <div className="text-gray-600 mb-1">Adresse wallet:</div>
+                            <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg p-2">
+                              <code className="text-gray-900 text-xs font-mono break-all flex-1">{selectedWithdrawal.cryptoAddress}</code>
+                              <button 
+                                onClick={() => copyToClipboard(selectedWithdrawal.cryptoAddress)} 
+                                className="text-gray-400 hover:text-gray-700 flex-shrink-0 p-1"
+                                title="Copier l'adresse"
+                              >
+                                {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {selectedWithdrawal.estimatedUSDT && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Montant USDT estimé:</span>
+                            <span className="text-blue-600 font-bold">{selectedWithdrawal.estimatedUSDT} USDT</span>
+                          </div>
+                        )}
+                        {selectedWithdrawal.txHash && (
+                          <div>
+                            <div className="text-gray-600 mb-1">TX Hash:</div>
+                            <div className="bg-white border border-gray-300 rounded-lg p-2">
+                              <code className="text-green-600 text-xs font-mono break-all">{selectedWithdrawal.txHash}</code>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {selectedWithdrawal.accountNumber && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Numéro:</span>
+                            <span className="text-gray-900 font-semibold font-mono">{selectedWithdrawal.accountNumber}</span>
+                          </div>
+                        )}
+                        {selectedWithdrawal.accountName && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Nom:</span>
+                            <span className="text-gray-900 font-semibold">{selectedWithdrawal.accountName}</span>
+                          </div>
+                        )}
+                      </>
                     )}
-                    {selectedWithdrawal.accountName && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Nom:</span>
-                        <span className="text-gray-900 font-semibold">{selectedWithdrawal.accountName}</span>
-                      </div>
-                    )}
+
                     <div className="flex justify-between">
                       <span className="text-gray-600">Date demande:</span>
                       <span className="text-gray-900 font-semibold">
@@ -444,6 +537,19 @@ export default function AdminWithdrawals() {
                     </div>
                   </div>
                 </div>
+
+                {/* Instructions crypto pour l'admin */}
+                {selectedWithdrawal.paymentMethod === 'crypto_usdt' && selectedWithdrawal.status === 'pending' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div className="text-blue-700 text-sm font-bold mb-2">Instructions pour le retrait crypto</div>
+                    <ol className="text-blue-600 text-xs space-y-1.5 list-decimal list-inside">
+                      <li>Copiez l&apos;adresse wallet ci-dessus</li>
+                      <li>Envoyez <strong>~{selectedWithdrawal.estimatedUSDT || '?'} USDT</strong> sur le réseau <strong>{selectedWithdrawal.cryptoNetwork || '?'}</strong></li>
+                      <li>Récupérez le TX Hash de la transaction</li>
+                      <li>Approuvez le retrait et renseignez le TX Hash</li>
+                    </ol>
+                  </div>
+                )}
 
                 {/* Actions selon statut */}
                 {selectedWithdrawal.status === 'pending' && (

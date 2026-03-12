@@ -1,0 +1,62 @@
+[
+  {
+    "userId": "6979a224f22929173e8d6df7",
+    "name": "XNX XX",
+    "email": "xnx00430@gmail.com",
+    "before": {
+      "balance": 267779.69,
+      "totalBenefits": 267423.01
+    },
+    "after": {
+      "balance": 45763.59,
+      "totalBenefits": 93764.73
+    },
+    "diff": 222016.1,
+    "fixedAt": "2026-03-12T05:50:23.213Z"
+  },
+  {
+    "userId": "697a7e72dcff7c664c9a39a1",
+    "name": "XNX XX",
+    "email": "amoujauresghaiyvzh@gmail.com",
+    "before": {
+      "balance": 245688.84,
+      "totalBenefits": 247177.14
+    },
+    "after": {
+      "balance": 87190.97,
+      "totalBenefits": 87191.59
+    },
+    "diff": 158497.87,
+    "fixedAt": "2026-03-12T05:50:23.213Z"
+  },
+  {
+    "userId": "698c6efc46da0727100a874e",
+    "name": "mabarack",
+    "email": "xxxxxxxxxxxxxxx-romi@gmail.com",
+    "before": {
+      "balance": 200428.03,
+      "totalBenefits": 189942.55
+    },
+    "after": {
+      "balance": 73900.5,
+      "totalBenefits": 73900.95
+    },
+    "diff": 126527.53,
+    "fixedAt": "2026-03-12T05:50:23.213Z"
+  },
+  {
+    "userId": "69961cab8155316f01156b60",
+    "name": "aholou romuald",
+    "email": "2250503341152",
+    "before": {
+      "balance": 15980.73,
+      "totalBenefits": 16071.07
+    },
+    "after": {
+      "balance": 6113.9,
+      "totalBenefits": 6113.95
+    },
+    "diff": 9866.83,
+    "fixedAt": "2026-03-12T05:50:23.213Z"
+  }
+]

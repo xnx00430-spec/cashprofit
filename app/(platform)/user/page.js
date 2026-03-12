@@ -1,15 +1,19 @@
 // app/(platform)/user/page.jsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Eye, EyeOff, TrendingUp, Wallet, Users, 
   Rocket, ArrowUpRight, ArrowDownLeft, Plus,
-  X, Check, Info, Clock, Target, AlertCircle, HelpCircle
+  X, Check, CheckCircle, Info, Clock, Target, AlertCircle, HelpCircle
 } from 'lucide-react';
+import KkiapayButton from '@/components/KkiapayButton';
+import CryptoPaymentModal from '@/components/CryptoPaymentModal';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [showInvestModal, setShowInvestModal] = useState(false);
@@ -24,39 +28,57 @@ export default function DashboardPage() {
   const [selectedOpp, setSelectedOpp] = useState(null);
   const [investAmount, setInvestAmount] = useState('');
   const [isInvesting, setIsInvesting] = useState(false);
+  const [payError, setPayError] = useState(null);
+  const [paySuccess, setPaySuccess] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    fetchUserData();
-    fetchOpportunities();
-    fetchInvestments();
-    
-    const interval = setInterval(() => {
-      fetchUserData();
-      fetchInvestments();
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  // Crypto
+  const [showCryptoModal, setShowCryptoModal] = useState(false);
 
-  const fetchUserData = async () => {
+  // ==================== FIX PRINCIPAL ====================
+  // On fetch user + investments EN MÊME TEMPS avec Promise.all
+  // pour éviter que le state soit désynchronisé entre les deux
+  // (c'est ça qui causait les sauts du solde total)
+  const fetchAllData = useCallback(async () => {
     try {
-      const res = await fetch('/api/user/profile');
-      const data = await res.json();
-      if (data.success) {
-        setUser(data.user);
-        setHasReferrer(data.user.hasReferrer || false);
-        // Afficher bienvenue si nouveau (pas encore investi)
-        if ((data.user.totalInvested || 0) === 0) {
+      const [profileRes, investRes] = await Promise.all([
+        fetch('/api/user/profile'),
+        fetch('/api/user/investments')
+      ]);
+      
+      const [profileData, investData] = await Promise.all([
+        profileRes.json(),
+        investRes.json()
+      ]);
+
+      // Mise à jour atomique des deux states
+      if (profileData.success) {
+        setUser(profileData.user);
+        setHasReferrer(profileData.user.hasReferrer || false);
+        if ((profileData.user.totalInvested || 0) === 0) {
           setShowWelcome(true);
         }
       }
+      if (investData.success) {
+        setInvestments(investData.investments);
+        if (investData.hasReferrer !== undefined) {
+          setHasReferrer(investData.hasReferrer);
+        }
+      }
     } catch (error) {
-      console.error('Erreur profile:', error);
+      console.error('Erreur fetch données:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    fetchAllData();
+    fetchOpportunities();
+    
+    const interval = setInterval(fetchAllData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAllData]);
 
   const fetchOpportunities = async () => {
     try {
@@ -68,50 +90,26 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchInvestments = async () => {
-    try {
-      const res = await fetch('/api/user/investments');
-      const data = await res.json();
-      if (data.success) {
-        setInvestments(data.investments);
-        if (data.hasReferrer !== undefined) setHasReferrer(data.hasReferrer);
-      }
-    } catch (error) {
-      console.error('Erreur investissements:', error);
-    }
+  const handlePaySuccess = (data) => {
+    setPaySuccess(true);
+    setIsInvesting(false);
+    setTimeout(() => {
+      fetchAllData();
+      setShowInvestModal(false);
+      setPaySuccess(false);
+      setSelectedOpp(null);
+      setInvestAmount('');
+    }, 2000);
   };
 
-  const handlePay = async () => {
-    const amount = Number(investAmount);
-    const min = selectedOpp.minInvestment || 1000;
-    const max = selectedOpp.maxInvestment || 10000000;
-    if (!amount || amount < min) {
-      alert(`Veuillez entrer un montant minimum de ${min.toLocaleString()} FCFA`);
-      return;
-    }
-    if (amount > max) {
-      alert(`Le montant maximum est de ${max.toLocaleString()} FCFA`);
-      return;
-    }
-    setIsInvesting(true);
-    try {
-      const res = await fetch('/api/payments/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opportunityId: selectedOpp.id, amount })
-      });
-      const data = await res.json();
-      if (data.success && data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else {
-        alert(data.message || 'Erreur lors de l\'initiation du paiement');
-      }
-    } catch (error) {
-      console.error('Erreur paiement:', error);
-      alert('Erreur lors du paiement. Veuillez réessayer.');
-    } finally {
-      setIsInvesting(false);
-    }
+  const handlePayError = (msg) => {
+    setPayError(msg);
+    setIsInvesting(false);
+  };
+
+  const handleCryptoSuccess = () => {
+    setShowCryptoModal(false);
+    fetchAllData();
   };
 
   const calculateProjection = () => {
@@ -183,7 +181,7 @@ export default function DashboardPage() {
                 <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-900 text-xs font-black">1</div>
                 <div>
                   <div className="text-white text-sm font-semibold">Faites votre premier investissement</div>
-                  <div className="text-white/50 text-xs">À partir de 10,000 FCFA via Mobile Money. Votre argent commence à travailler immédiatement.</div>
+                  <div className="text-white/50 text-xs">À partir de 10,000 FCFA via Mobile Money ou Crypto USDT. Votre argent commence à travailler immédiatement.</div>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -336,7 +334,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* BREAKDOWN SOLDES avec explications */}
+            {/* BREAKDOWN SOLDES */}
             {showBalance && user && (
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white/70 backdrop-blur-xl border border-gray-200 rounded-2xl p-4 shadow-md">
@@ -400,7 +398,6 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   ))}
-                  
                   {hasReferrer && (
                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
                       <div className="text-orange-600 text-xs">
@@ -423,16 +420,13 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
           </div>
 
           {/* SIDEBAR */}
           <div className="space-y-6">
-            
             <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
               <h3 className="text-gray-900 text-lg font-bold mb-1">Résumé de votre compte</h3>
               <p className="text-gray-400 text-xs mb-5">Vue d&apos;ensemble de votre activité</p>
-              
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -457,8 +451,6 @@ export default function DashboardPage() {
                   </div>
                   <span className="text-gray-900 font-bold">{(user?.totalInvested || 0).toLocaleString()} F</span>
                 </div>
-
-                {/* Gains live */}
                 <div className="bg-green-50 border border-green-200 rounded-xl p-3 -mx-1">
                   <div className="flex items-center justify-between mb-1">
                     <div>
@@ -485,7 +477,6 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
-
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <Link href="/user/reseau" className="flex items-center justify-between text-sm text-gray-600 hover:text-gray-900 transition-colors">
                   <div>
@@ -578,9 +569,7 @@ export default function DashboardPage() {
 
                       return (
                         <div className="bg-white rounded-2xl p-4 mb-4 shadow-md">
-                          <div className="text-xs font-bold text-gray-900 mb-3">
-                            Ce que vous débloquez au niveau {nextLevel} :
-                          </div>
+                          <div className="text-xs font-bold text-gray-900 mb-3">Ce que vous débloquez au niveau {nextLevel} :</div>
                           <div className="space-y-2.5">
                             {bonusDiff > 0 && (
                               <div className="flex items-start gap-2.5 bg-green-50 border border-green-200 rounded-xl p-2.5">
@@ -593,7 +582,6 @@ export default function DashboardPage() {
                                 </div>
                               </div>
                             )}
-
                             {hasCommissions && (
                               <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-xl p-2.5">
                                 <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -605,7 +593,6 @@ export default function DashboardPage() {
                                 </div>
                               </div>
                             )}
-
                             <div className="flex items-start gap-2.5 bg-yellow-50 border border-yellow-200 rounded-xl p-2.5">
                               <div className="w-7 h-7 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
                                 <span className="text-white text-xs font-bold">F</span>
@@ -616,7 +603,6 @@ export default function DashboardPage() {
                               </div>
                             </div>
                           </div>
-
                           <div className="mt-3 pt-3 border-t border-gray-100">
                             <div className="flex items-center gap-1.5 text-gray-500 text-[10px]">
                               <Clock size={10} />
@@ -635,31 +621,47 @@ export default function DashboardPage() {
                 </Link>
               </div>
             )}
-
           </div>
         </div>
       </div>
 
-      {/* MODAL INVESTIR */}
+      {/* ==================== MODAL INVESTIR KKIAPAY ==================== */}
       {showInvestModal && (
         <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-gray-200 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
               <div>
                 <h2 className="text-gray-900 text-2xl font-bold">Investir</h2>
                 <p className="text-gray-500 text-xs mt-0.5">Choisissez une opportunité et le montant à investir</p>
               </div>
-              <button onClick={() => { setShowInvestModal(false); setSelectedOpp(null); setInvestAmount(''); }}
+              <button onClick={() => { setShowInvestModal(false); setSelectedOpp(null); setInvestAmount(''); setPayError(null); setPaySuccess(false); }}
                 className="text-gray-500 hover:text-gray-900 p-2">
                 <X size={24} />
               </button>
             </div>
 
-            {!selectedOpp ? (
+            {/* Succès */}
+            {paySuccess && (
+              <div className="p-6 text-center">
+                <CheckCircle className="text-green-500 mx-auto mb-3" size={48} />
+                <div className="text-green-700 text-xl font-bold mb-1">Investissement réussi !</div>
+                <div className="text-green-600 text-sm">Vos gains commencent maintenant. Redirection...</div>
+              </div>
+            )}
+
+            {/* Erreur */}
+            {payError && (
+              <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="text-red-600 text-sm">{payError}</div>
+                <button onClick={() => setPayError(null)} className="text-red-400 text-xs mt-1 underline">Fermer</button>
+              </div>
+            )}
+
+            {!paySuccess && !selectedOpp ? (
               <div className="p-6 space-y-3">
                 {opportunities.map((opp) => (
-                  <button key={opp.id} onClick={() => { setSelectedOpp(opp); setInvestAmount(''); }}
+                  <button key={opp.id} onClick={() => { setSelectedOpp(opp); setInvestAmount(''); setPayError(null); }}
                     className="w-full bg-white/70 backdrop-blur-xl hover:bg-white border border-gray-200 hover:border-yellow-400 rounded-2xl p-4 text-left transition-all shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -682,9 +684,9 @@ export default function DashboardPage() {
                   </button>
                 ))}
               </div>
-            ) : (
+            ) : !paySuccess && selectedOpp ? (
               <div className="p-6">
-                <button onClick={() => { setSelectedOpp(null); setInvestAmount(''); }}
+                <button onClick={() => { setSelectedOpp(null); setInvestAmount(''); setPayError(null); }}
                   className="text-gray-600 hover:text-gray-900 text-sm mb-6 flex items-center gap-2">
                   ← Retour
                 </button>
@@ -711,7 +713,7 @@ export default function DashboardPage() {
                 <div className="mb-6">
                   <label className="text-gray-900 font-semibold mb-1 block">Combien voulez-vous investir ?</label>
                   <p className="text-gray-400 text-xs mb-3">Entrez le montant en FCFA</p>
-                  <input type="number" value={investAmount} onChange={(e) => setInvestAmount(e.target.value)}
+                  <input type="number" value={investAmount} onChange={(e) => { setInvestAmount(e.target.value); setPayError(null); }}
                     placeholder="Ex: 50000" min={selectedOpp.minInvestment || 1000} step="1000"
                     className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-4 text-xl font-bold focus:border-yellow-400 focus:outline-none placeholder:text-gray-400 placeholder:text-base placeholder:font-normal" />
                   <p className="text-gray-500 text-xs mt-2">
@@ -739,20 +741,56 @@ export default function DashboardPage() {
 
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-6">
                   <div className="text-gray-700 text-xs">
-                    <strong>Comment ça marche :</strong> votre argent reste investi et génère des gains chaque seconde. Vous pouvez retirer vos bénéfices quand vous voulez. Votre capital reste en place pour continuer à travailler.
+                    <strong>Paiement :</strong> choisissez votre méthode ci-dessous. Mobile Money / carte bancaire (instantané) ou Crypto USDT (validation manuelle sous 24h).
                   </div>
                 </div>
 
-                <button onClick={handlePay}
-                  disabled={isInvesting || !investAmount || Number(investAmount) < (selectedOpp.minInvestment || 1000)}
-                  className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md">
-                  {isInvesting ? 'Redirection vers le paiement...' : investAmount ? `Payer ${Number(investAmount).toLocaleString()} FCFA` : 'Entrez un montant'}
-                </button>
+                {/* Boutons de paiement */}
+                <div className="space-y-3">
+                  <KkiapayButton
+                    amount={Number(investAmount)}
+                    opportunityId={selectedOpp.id}
+                    opportunityName={selectedOpp.name}
+                    customerName={user?.name || ''}
+                    customerEmail={user?.email || ''}
+                    customerPhone={user?.phone || ''}
+                    onSuccess={handlePaySuccess}
+                    onError={handlePayError}
+                    onLoading={(loading) => setIsInvesting(loading)}
+                    disabled={isInvesting || !investAmount || Number(investAmount) < (selectedOpp.minInvestment || 1000)}
+                    className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
+                  >
+                    {isInvesting ? 'Vérification en cours...' : investAmount ? `Payer ${Number(investAmount).toLocaleString()} FCFA` : 'Entrez un montant'}
+                  </KkiapayButton>
+
+                  {/* Bouton Crypto */}
+                  <button
+                    onClick={() => {
+                      setShowInvestModal(false);
+                      setShowCryptoModal(true);
+                    }}
+                    disabled={!investAmount || Number(investAmount) < (selectedOpp.minInvestment || 1000)}
+                    className="w-full bg-white border-2 border-yellow-400 text-yellow-700 font-bold py-4 rounded-xl hover:bg-yellow-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                  >
+                    <Wallet size={18} />
+                    Payer par Crypto (USDT)
+                  </button>
+                </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
+
+      {/* ==================== MODAL CRYPTO ==================== */}
+      <CryptoPaymentModal
+        isOpen={showCryptoModal}
+        onClose={() => setShowCryptoModal(false)}
+        amount={Number(investAmount)}
+        opportunityId={selectedOpp?.id}
+        opportunityName={selectedOpp?.name}
+        onSuccess={handleCryptoSuccess}
+      />
     </div>
   );
 }

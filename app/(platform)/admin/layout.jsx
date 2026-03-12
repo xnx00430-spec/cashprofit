@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   LogOut,
-  CreditCard
+  CreditCard,
+  Bitcoin
 } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
@@ -32,6 +33,11 @@ export default function AdminLayout({ children }) {
       name: 'Investisseurs',
       path: '/admin/investisseurs',
       icon: Users
+    },
+    {
+      name: 'Paiements Crypto',
+      path: '/admin/crypto',
+      icon: Bitcoin
     },
     {
       name: 'Gestion Manuelle',

@@ -64,6 +64,8 @@ export async function PUT(request, context) {
     // Récupérer le user
     const user = await User.findById(withdrawal.userId).select('name email phone');
 
+    const isCrypto = withdrawal.paymentMethod === 'crypto_usdt';
+
     // Appliquer l'action
     switch (action) {
       case 'approve':
@@ -71,7 +73,7 @@ export async function PUT(request, context) {
         if (adminNotes) withdrawal.adminNotes = adminNotes;
         await withdrawal.save();
         
-        // 🔔 Notification in-app
+        // 🔔 Notification
         try {
           await createNotification(
             withdrawal.userId,
@@ -85,7 +87,7 @@ export async function PUT(request, context) {
         if (adminNotes) withdrawal.adminNotes = adminNotes;
         await withdrawal.save();
         
-        // 🔔 Notification in-app
+        // 🔔 Notification
         try {
           await createNotification(
             withdrawal.userId,
@@ -104,24 +106,31 @@ export async function PUT(request, context) {
         }
         
         await withdrawal.complete(payload.userId, transactionId);
-        if (adminNotes) {
-          withdrawal.adminNotes = adminNotes;
-          await withdrawal.save();
+        
+        // Sauvegarder le txHash pour les retraits crypto
+        if (isCrypto && transactionId) {
+          withdrawal.txHash = transactionId;
         }
         
-        // 🔔 Notification in-app
+        if (adminNotes) withdrawal.adminNotes = adminNotes;
+        await withdrawal.save();
+        
+        // 🔔 Notification
         try {
+          const methodLabel = isCrypto 
+            ? `Crypto USDT (${withdrawal.cryptoNetwork || 'USDT'})` 
+            : withdrawal.paymentMethod;
           await createNotification(
             withdrawal.userId,
             NotificationTemplates.withdrawalCompleted(withdrawal.amount)
           );
         } catch (e) { console.error('Notif error:', e); }
 
-        // ✉️ EMAIL: Retrait complété (argent envoyé)
+        // ✉️ EMAIL: Retrait complété
         if (user?.email) {
           sendWithdrawalCompletedEmail(user.email, user.name, {
             amount: withdrawal.amount,
-            method: withdrawal.paymentMethod
+            method: isCrypto ? `USDT ${withdrawal.cryptoNetwork || ''}` : withdrawal.paymentMethod
           }).catch(console.error);
         }
         break;
@@ -138,6 +147,9 @@ export async function PUT(request, context) {
         id: withdrawal._id,
         status: withdrawal.status,
         amount: withdrawal.amount,
+        paymentMethod: withdrawal.paymentMethod,
+        cryptoNetwork: withdrawal.cryptoNetwork || null,
+        txHash: withdrawal.txHash || null,
         user: user?.name,
         processedAt: withdrawal.processedAt,
         completedAt: withdrawal.completedAt,

@@ -15,7 +15,7 @@ const WithdrawalSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['gains', 'commissions', 'bonus'], // Ajout 'bonus'
+    enum: ['gains', 'commissions', 'bonus'],
     required: true
   },
   status: {
@@ -26,7 +26,7 @@ const WithdrawalSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['mobile_money', 'bank_transfer', 'wave', 'orange_money', 'mtn_money', 'moov_money'],
+    enum: ['mobile_money', 'bank_transfer', 'wave', 'orange_money', 'mtn_money', 'moov_money', 'crypto_usdt'],
     required: true
   },
   accountNumber: {
@@ -37,7 +37,29 @@ const WithdrawalSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  // Traitement admin
+
+  // ==================== CRYPTO FIELDS ====================
+  cryptoNetwork: {
+    type: String,
+    enum: ['TRC20', 'BEP20', 'ERC20', null],
+    default: null
+  },
+  cryptoAddress: {
+    type: String,
+    default: null
+  },
+  // Montant USDT estimé au moment de la demande
+  estimatedUSDT: {
+    type: Number,
+    default: null
+  },
+  // Hash de la transaction crypto (rempli par l'admin après envoi)
+  txHash: {
+    type: String,
+    default: null
+  },
+
+  // ==================== TRAITEMENT ADMIN ====================
   processedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -69,18 +91,15 @@ const WithdrawalSchema = new mongoose.Schema({
   cancelledAt: {
     type: Date
   },
-  // ID de transaction du paiement
   transactionId: {
     type: String
   },
   transactionRef: {
     type: String
   },
-  // Raison de rejet
   rejectionReason: {
     type: String
   },
-  // Notes admin
   adminNotes: {
     type: String
   }

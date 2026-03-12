@@ -131,7 +131,7 @@ WithdrawalSchema.methods.reject = async function(adminId, reason) {
   this.rejectedAt = new Date();
   this.rejectionReason = reason;
   
-  // Rembourser le montant
+  // Rembourser le montant + corriger totalWithdrawn
   const User = mongoose.model('User');
   const user = await User.findById(this.userId);
   if (user) {
@@ -142,6 +142,8 @@ WithdrawalSchema.methods.reject = async function(adminId, reason) {
     } else if (this.type === 'bonus') {
       user.bonusParrainage = (user.bonusParrainage || 0) + this.amount;
     }
+    // Décrémenter totalWithdrawn car le retrait est annulé
+    user.totalWithdrawn = Math.max((user.totalWithdrawn || 0) - this.amount, 0);
     await user.save();
   }
   

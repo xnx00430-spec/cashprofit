@@ -5,6 +5,7 @@ import User from '@/models/User';
 import Investment from '@/models/Investment';
 import Opportunity from '@/models/Opportunity';
 import { verifyAuth } from '@/lib/auth';
+import { performLevelUp } from '@/lib/levelUp';
 import { createNotification, NotificationTemplates } from '@/lib/notifications';
 
 const REFERRAL_BONUS = 10000;
@@ -59,20 +60,13 @@ export async function GET(request) {
       const activeWeeks = Math.min(Math.max(weeksElapsed, 0), maxWeeks);
       const weeklyEarning = inv.amount * (inv.weeklyRate / 100);
       
-      // Gains bruts totaux depuis le début
       const grossEarnings = weeklyEarning * activeWeeks;
-      
-      // Gains déjà synchronisés en DB
       const lastSynced = inv.lastSyncedEarnings || 0;
-      
-      // Gains pas encore en DB (pour le sync au moment du retrait)
       const unsyncedGross = Math.max(grossEarnings - lastSynced, 0);
       const unsyncedNet = hasReferrer 
         ? unsyncedGross * (1 - REFERRER_CUT) 
         : unsyncedGross;
 
-      // ========== CLÉ : gains nets TOTAUX depuis le début ==========
-      // C'est ce que le frontend affiche comme "gains live"
       const totalNetEarnings = hasReferrer 
         ? grossEarnings * (1 - REFERRER_CUT) 
         : grossEarnings;
@@ -95,9 +89,7 @@ export async function GET(request) {
         startDate: inv.startDate,
         endDate: inv.endDate,
         status: inv.status,
-        // ========== GAINS NETS TOTAUX (ne repart jamais à 0) ==========
         currentEarnings: Math.round(totalNetEarnings * 100) / 100,
-        // Gains non encore synchronisés en DB (pour usage interne)
         unsyncedEarnings: Math.round(unsyncedNet * 100) / 100,
         grossEarnings: Math.round(grossEarnings * 100) / 100,
         referrerCut: hasReferrer ? Math.round(grossEarnings * REFERRER_CUT * 100) / 100 : 0,
@@ -220,24 +212,33 @@ export async function POST(request) {
     user.totalInvested += amount;
     user.activeInvestments += 1;
 
+    // Ajouter à la cagnotte (sauf le premier investissement)
     if (!isFirstInvestment) {
       user.currentLevelCagnotte = (user.currentLevelCagnotte || 0) + amount;
     }
 
+    // Vérifier level up (propre investissement fait dépasser le target)
     if (user.canLevelUp()) {
-      const oldLevel = user.level;
-      user.levelUp();
-      try {
-        await createNotification(user._id,
-          NotificationTemplates.levelUp(user.level, `Niveau ${user.level} atteint ! Bonus : +${user.getRateBonus()}%`)
-        );
-      } catch (e) { console.error('Notif error:', e); }
+      await user.save(); // Sauvegarder d'abord les changements
+      const result = await performLevelUp(user._id);
+      if (result.success) {
+        try {
+          await createNotification(user._id,
+            NotificationTemplates.levelUp(result.newLevel, 
+              `Niveau ${result.newLevel} atteint ! Bonus : +${result.rateBonus}% sur tous vos investissements !`)
+          );
+        } catch (e) { console.error('Notif error:', e); }
+      }
+    } else {
+      await user.save();
     }
 
+    // Gérer le parrain
     if (user.referredBy) {
       try {
         const sponsor = await User.findById(user.referredBy);
         if (sponsor) {
+          // Bonus 10 000 F au premier investissement du filleul
           if (isFirstInvestment) {
             sponsor.bonusParrainage = (sponsor.bonusParrainage || 0) + REFERRAL_BONUS;
             try {
@@ -250,28 +251,34 @@ export async function POST(request) {
             } catch (e) { console.error('Notif error:', e); }
           }
 
+          // Ajouter à la cagnotte du parrain
           sponsor.currentLevelCagnotte = (sponsor.currentLevelCagnotte || 0) + amount;
 
+          // Vérifier level up du parrain
           if (sponsor.canLevelUp()) {
-            sponsor.levelUp();
-            try {
-              await createNotification(sponsor._id,
-                NotificationTemplates.levelUp(sponsor.level, `Niveau ${sponsor.level} atteint !`)
-              );
-            } catch (e) { console.error('Notif error:', e); }
+            await sponsor.save(); // Sauvegarder d'abord
+            const result = await performLevelUp(sponsor._id);
+            if (result.success) {
+              try {
+                await createNotification(sponsor._id,
+                  NotificationTemplates.levelUp(result.newLevel, 
+                    `Niveau ${result.newLevel} atteint ! Bonus : +${result.rateBonus}% sur tous vos investissements !`)
+                );
+              } catch (e) { console.error('Notif error:', e); }
+            }
+          } else {
+            await sponsor.save();
           }
-
-          await sponsor.save();
         }
       } catch (e) { console.error('Referral error:', e); }
     }
 
-    await user.save();
-
+    // Mettre à jour l'opportunité
     opportunity.totalInvested = (opportunity.totalInvested || 0) + amount;
     opportunity.activeInvestors += 1;
     await opportunity.save();
 
+    // Notification investissement réussi
     try {
       await createNotification(user._id,
         NotificationTemplates.investmentSuccess(amount, opportunity.name)

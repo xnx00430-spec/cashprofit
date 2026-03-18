@@ -65,7 +65,7 @@ export default function PortefeuillePage() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawType, setWithdrawType] = useState(null);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('mobile_money');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -236,7 +236,7 @@ export default function PortefeuillePage() {
     setAccountName('');
     setCryptoAddress('');
     setCryptoNetwork('TRC20');
-    setPaymentMethod('mobile_money');
+    setPaymentMethod('');
   };
 
   const openWithdrawModal = (type) => {
@@ -257,13 +257,60 @@ export default function PortefeuillePage() {
 
   const getMethodLabel = (method) => {
     const labels = {
-      mobile_money: 'Mobile Money',
-      wave: 'Wave',
-      orange_money: 'Orange Money',
-      mtn_money: 'MTN Money',
-      moov_money: 'Moov Money',
-      bank_transfer: 'Virement bancaire',
-      crypto_usdt: 'Crypto USDT'
+      'orange_money_ci': 'Orange Money (CI)',
+      'wave_ci': 'Wave (CI)',
+      'mtn_money_ci': 'MTN Money (CI)',
+      'moov_money_ci': 'Moov Money (CI)',
+      'orange_money_sn': 'Orange Money (SN)',
+      'wave_sn': 'Wave (SN)',
+      'expresso_sn': 'Expresso (SN)',
+      'free_money_sn': 'Free Money (SN)',
+      'orange_money_ml': 'Orange Money (ML)',
+      'moov_money_ml': 'Moov Money (ML)',
+      'malitel_ml': 'Malitel (ML)',
+      'orange_money_bf': 'Orange Money (BF)',
+      'moov_money_bf': 'Moov Money (BF)',
+      'airtel_money_bf': 'Airtel Money (BF)',
+      'orange_money_ne': 'Orange Money (NE)',
+      'moov_money_ne': 'Moov Money (NE)',
+      'airtel_money_ne': 'Airtel Money (NE)',
+      'orange_money_bj': 'Orange Money (BJ)',
+      'moov_money_bj': 'Moov Money (BJ)',
+      'mtn_money_bj': 'MTN Money (BJ)',
+      'orange_money_tg': 'Orange Money (TG)',
+      'moov_money_tg': 'Moov Money (TG)',
+      'mtn_money_tg': 'MTN Money (TG)',
+      'orange_money_cm': 'Orange Money (CM)',
+      'mtn_money_cm': 'MTN Money (CM)',
+      'nexttel_cm': 'Nexttel (CM)',
+      'orange_money_ga': 'Orange Money (GA)',
+      'moov_money_ga': 'Moov Money (GA)',
+      'orange_money_cg': 'Orange Money (CG)',
+      'moov_money_cg': 'Moov Money (CG)',
+      'orange_money_gn': 'Orange Money (GN)',
+      'moov_money_gn': 'Moov Money (GN)',
+      'mtn_money_gn': 'MTN Money (GN)',
+      'orange_money_cf': 'Orange Money (CF)',
+      'moov_money_cf': 'Moov Money (CF)',
+      'orange_money_td': 'Orange Money (TD)',
+      'moov_money_td': 'Moov Money (TD)',
+      'mtn_money_gh': 'MTN Money (GH)',
+      'vodafone_gh': 'Vodafone (GH)',
+      'airteltigo_gh': 'AirtelTigo (GH)',
+      'orange_money_lr': 'Orange Money (LR)',
+      'lonestar_lr': 'Lonestar (LR)',
+      'orange_money_sl': 'Orange Money (SL)',
+      'africell_sl': 'Africell (SL)',
+      'sierratel_sl': 'Sierratel (SL)',
+      'chinguitel_mr': 'Chinguitel (MR)',
+      'maroc_telecom_mr': 'Maroc Telecom (MR)',
+      'mauritel_mr': 'Mauritel (MR)',
+      'mobile_money': 'Mobile Money',
+      'wave': 'Wave',
+      'orange_money': 'Orange Money',
+      'mtn_money': 'MTN Money',
+      'bank_transfer': 'Virement bancaire',
+      'crypto_usdt': 'Crypto USDT'
     };
     return labels[method] || method;
   };
@@ -603,17 +650,66 @@ export default function PortefeuillePage() {
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full bg-white border border-gray-300 text-gray-900 rounded-xl px-4 py-3 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 focus:outline-none text-sm"
                   >
-                    <optgroup label="Mobile Money">
-                      <option value="mobile_money">Mobile Money</option>
-                      <option value="wave">Wave</option>
-                      <option value="orange_money">Orange Money</option>
-                      <option value="mtn_money">MTN Money</option>
+                    <option value="">-- Choisir une méthode --</option>
+                    <optgroup label="Crypto">
+                      <option value="crypto_usdt">💎 USDT (Crypto)</option>
+                    </optgroup>
+                    <optgroup label="Mobile Money - Afrique de l'Ouest">
+                      <option value="orange_money_ci">🇨🇮 Orange Money (Côte d'Ivoire)</option>
+                      <option value="wave_ci">🇨🇮 Wave (Côte d'Ivoire)</option>
+                      <option value="mtn_money_ci">🇨🇮 MTN Mobile Money (Côte d'Ivoire)</option>
+                      <option value="moov_money_ci">🇨🇮 Moov Money (Côte d'Ivoire)</option>
+                      <option value="orange_money_sn">🇸🇳 Orange Money (Sénégal)</option>
+                      <option value="wave_sn">🇸🇳 Wave (Sénégal)</option>
+                      <option value="expresso_sn">🇸🇳 Expresso Money (Sénégal)</option>
+                      <option value="free_money_sn">🇸🇳 Free Money (Sénégal)</option>
+                      <option value="orange_money_ml">🇲🇱 Orange Money (Mali)</option>
+                      <option value="moov_money_ml">🇲🇱 Moov Money (Mali)</option>
+                      <option value="malitel_ml">🇲🇱 Malitel Money (Mali)</option>
+                      <option value="orange_money_bf">🇧🇫 Orange Money (Burkina Faso)</option>
+                      <option value="moov_money_bf">🇧🇫 Moov Money (Burkina Faso)</option>
+                      <option value="airtel_money_bf">🇧🇫 Airtel Money (Burkina Faso)</option>
+                      <option value="orange_money_ne">🇳🇪 Orange Money (Niger)</option>
+                      <option value="moov_money_ne">🇳🇪 Moov Money (Niger)</option>
+                      <option value="airtel_money_ne">🇳🇪 Airtel Money (Niger)</option>
+                      <option value="orange_money_bj">🇧🇯 Orange Money (Bénin)</option>
+                      <option value="moov_money_bj">🇧🇯 Moov Money (Bénin)</option>
+                      <option value="mtn_money_bj">🇧🇯 MTN Mobile Money (Bénin)</option>
+                      <option value="orange_money_tg">🇹🇬 Orange Money (Togo)</option>
+                      <option value="moov_money_tg">🇹🇬 Moov Money (Togo)</option>
+                      <option value="mtn_money_tg">🇹🇬 MTN Mobile Money (Togo)</option>
+                    </optgroup>
+                    <optgroup label="Mobile Money - Afrique Centrale">
+                      <option value="orange_money_cm">🇨🇲 Orange Money (Cameroun)</option>
+                      <option value="mtn_money_cm">🇨🇲 MTN Mobile Money (Cameroun)</option>
+                      <option value="nexttel_cm">🇨🇲 Nexttel Money (Cameroun)</option>
+                      <option value="orange_money_ga">🇬🇦 Orange Money (Gabon)</option>
+                      <option value="moov_money_ga">🇬🇦 Moov Money (Gabon)</option>
+                      <option value="orange_money_cg">🇨🇬 Orange Money (Congo)</option>
+                      <option value="moov_money_cg">🇨🇬 Moov Money (Congo)</option>
+                      <option value="orange_money_gn">🇬🇳 Orange Money (Guinée)</option>
+                      <option value="moov_money_gn">🇬🇳 Moov Money (Guinée)</option>
+                      <option value="mtn_money_gn">🇬🇳 MTN Mobile Money (Guinée)</option>
+                      <option value="orange_money_cf">🇨🇫 Orange Money (RCA)</option>
+                      <option value="moov_money_cf">🇨🇫 Moov Money (RCA)</option>
+                      <option value="orange_money_td">🇹🇩 Orange Money (Tchad)</option>
+                      <option value="moov_money_td">🇹🇩 Moov Money (Tchad)</option>
+                    </optgroup>
+                    <optgroup label="Mobile Money - Autres Pays">
+                      <option value="mtn_money_gh">🇬🇭 MTN Mobile Money (Ghana)</option>
+                      <option value="vodafone_gh">🇬🇭 Vodafone Cash (Ghana)</option>
+                      <option value="airteltigo_gh">🇬🇭 AirtelTigo Money (Ghana)</option>
+                      <option value="orange_money_lr">🇱🇷 Orange Money (Liberia)</option>
+                      <option value="lonestar_lr">🇱🇷 Lonestar Cell (Liberia)</option>
+                      <option value="orange_money_sl">🇸🇱 Orange Money (Sierra Leone)</option>
+                      <option value="africell_sl">🇸🇱 Africell (Sierra Leone)</option>
+                      <option value="sierratel_sl">🇸🇱 Sierratel (Sierra Leone)</option>
+                      <option value="chinguitel_mr">🇲🇷 Chinguitel Money (Mauritanie)</option>
+                      <option value="maroc_telecom_mr">🇲🇷 Maroc Telecom (Mauritanie)</option>
+                      <option value="mauritel_mr">🇲🇷 Mauritel Money (Mauritanie)</option>
                     </optgroup>
                     <optgroup label="Virement">
                       <option value="bank_transfer">Virement bancaire</option>
-                    </optgroup>
-                    <optgroup label="Crypto">
-                      <option value="crypto_usdt">USDT (Crypto)</option>
                     </optgroup>
                   </select>
                 </div>

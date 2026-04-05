@@ -1,27 +1,8 @@
-// components/KkiapayButton.jsx
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import Script from 'next/script';
 
-/**
- * Bouton de paiement KkiaPay avec pré-remplissage des données utilisateur
- * 
- * Usage:
- * <KkiapayButton
- *   amount={50000}
- *   opportunityId="abc123"
- *   opportunityName="Or Premium"
- *   customerName="Kouadio Jean"
- *   customerEmail="jean@email.com"
- *   customerPhone="0700000000"
- *   onSuccess={(data) => router.push('/user')}
- *   onError={(msg) => setError(msg)}
- *   className="bg-yellow-400 text-black font-bold py-4 rounded-xl w-full"
- * >
- *   Investir 50,000 FCFA
- * </KkiapayButton>
- */
 export default function KkiapayButton({
   amount,
   opportunityId,
@@ -36,13 +17,21 @@ export default function KkiapayButton({
   className = '',
   children
 }) {
+  const [config, setConfig] = useState(null);
   const sdkLoaded = useRef(false);
   const listenerAttached = useRef(false);
+
+  // Récupérer la config au montage
+  useEffect(() => {
+    fetch('/api/config/kkiapay')
+      .then(r => r.json())
+      .then(setConfig)
+      .catch(err => console.error('Erreur fetch config:', err));
+  }, []);
 
   const handlePaymentSuccess = useCallback(async (response) => {
     const transactionId = response.transactionId;
     console.log('💳 KkiaPay success, transactionId:', transactionId);
-
     onLoading?.(true);
 
     try {
@@ -51,9 +40,7 @@ export default function KkiapayButton({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transactionId, opportunityId, amount }),
       });
-
       const data = await res.json();
-
       if (data.success) {
         console.log('✅ Investment created:', data.investmentId);
         onSuccess?.(data);
@@ -69,13 +56,11 @@ export default function KkiapayButton({
     }
   }, [amount, opportunityId, onSuccess, onError, onLoading]);
 
-  // Attacher le listener une fois le SDK chargé
   useEffect(() => {
     if (typeof window !== 'undefined' && window.addSuccessListener && !listenerAttached.current) {
       window.addSuccessListener(handlePaymentSuccess);
       listenerAttached.current = true;
     }
-
     return () => {
       if (typeof window !== 'undefined' && window.removeKkiapayListener) {
         window.removeKkiapayListener('success', handlePaymentSuccess);
@@ -93,11 +78,15 @@ export default function KkiapayButton({
   };
 
   const openPayment = () => {
+    if (!config) {
+      onError?.('Configuration non chargée. Veuillez réessayer.');
+      return;
+    }
     if (typeof window !== 'undefined' && window.openKkiapayWidget) {
       window.openKkiapayWidget({
         amount: amount,
-        key: process.env.KKIAPAY_PUBLIC_KEY,
-        sandbox: false,
+        key: config.publicKey,
+        sandbox: config.sandbox,
         theme: '#f0b90b',
         name: customerName,
         email: customerEmail,
@@ -121,7 +110,7 @@ export default function KkiapayButton({
       <button
         type="button"
         onClick={openPayment}
-        disabled={disabled || !amount || amount < 1000}
+        disabled={disabled || !amount || amount < 1000 || !config}
         className={className}
       >
         {children || `Payer ${amount?.toLocaleString() || ''} FCFA`}

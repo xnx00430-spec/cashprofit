@@ -9,12 +9,9 @@ import Investment from '@/models/Investment';
 import { verifyAuth } from '@/lib/auth';
 import { verifyTransaction } from '@/lib/kkiapay';
 
-// Importer la logique commune depuis le webhook
-// On ne peut pas importer directement depuis route.js, donc on duplique le getPendingPaymentModel
 function getPendingPaymentModel() {
   const schema = new mongoose.Schema({
     transactionId: { type: String, unique: true, sparse: true },
-    depositId: { type: String, unique: true, sparse: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     opportunityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Opportunity', required: true },
     amount: { type: Number, required: true },
@@ -70,26 +67,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Le montant payé ne correspond pas' }, { status: 400 });
     }
 
-    // ==================== CRÉER/METTRE À JOUR LE PENDING PAYMENT ====================
-    const PendingPayment = getPendingPaymentModel();
-    
-    // Chercher un pending existant ou en créer un
-    let pending = await PendingPayment.findOne({
-      $or: [{ transactionId }, { depositId: transactionId }]
-    });
-
-    if (pending && pending.status === 'completed') {
-      // Déjà traité par le webhook
-      const inv = await Investment.findOne({ 'paymentDetails.transactionId': transactionId });
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Investissement déjà créé', 
-        investmentId: inv?._id 
-      });
-    }
-
-    // Si pas de pending (le webhook n'a pas encore créé le pending),
-    // on crée l'investissement directement
+    // ==================== RÉCUPÉRER L'UTILISATEUR ET L'OPPORTUNITÉ ====================
     const user = await User.findById(payload.userId);
     if (!user) {
       return NextResponse.json({ success: false, message: 'Utilisateur non trouvé' }, { status: 404 });
@@ -100,43 +78,57 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Opportunité non disponible' }, { status: 404 });
     }
 
-    // Importer dynamiquement la fonction commune
-    const { createInvestmentFromPayment } = await import('@/app/api/payments/webhook/route');
+    // ==================== CRÉER L'INVESTISSEMENT ====================
+    const investment = new Investment({
+      userId: payload.userId,
+      opportunityId,
+      amount: verification.amount,
+      initialRate: opportunity.baseRate || opportunity.finalRate,
+      finalRate: opportunity.finalRate,
+      bonus: opportunity.bonus || 0,
+      earnPerWeek: (verification.amount * (opportunity.finalRate / 100)),
+      earnPerDay: (verification.amount * (opportunity.finalRate / 100)) / 7,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 an
+      status: 'active',
+      paymentDetails: {
+        provider: 'kkiapay',
+        transactionId,
+        method: verification.source || 'mobile_money',
+        status: 'completed',
+        completedAt: new Date(verification.performedAt || Date.now())
+      },
+      currentEarnings: 0,
+      totalEarnings: 0,
+    });
+
+    await investment.save();
+
+    // ==================== METTRE À JOUR L'UTILISATEUR ====================
+    user.totalInvested = (user.totalInvested || 0) + verification.amount;
+    user.activeInvestments = (user.activeInvestments || 0) + 1;
+    await user.save();
+
+    // ==================== SAUVEGARDER LE PENDING PAYMENT ====================
+    const PendingPayment = getPendingPaymentModel();
     
-    const result = await createInvestmentFromPayment({
+    await PendingPayment.create({
       transactionId,
       userId: payload.userId,
       opportunityId,
-      amount: verification.amount, // Montant réellement payé
+      amount: verification.amount,
+      status: 'completed',
       provider: 'kkiapay'
     });
 
-    if (!result.success && !result.alreadyExists) {
-      return NextResponse.json({ success: false, message: result.error || 'Erreur création investissement' }, { status: 500 });
-    }
-
-    // Mettre à jour ou créer le pending
-    if (pending) {
-      pending.status = 'completed';
-      pending.transactionId = transactionId;
-      await pending.save();
-    } else {
-      await PendingPayment.create({
-        transactionId,
-        userId: payload.userId,
-        opportunityId,
-        amount: verification.amount,
-        status: 'completed',
-        provider: 'kkiapay'
-      });
-    }
+    console.log(`✅ Investment created from KkiaPay: ${transactionId} - ${user.name} - ${verification.amount} FCFA`);
 
     return NextResponse.json({
       success: true,
-      message: result.alreadyExists ? 'Investissement déjà créé' : 'Investissement créé avec succès',
-      investmentId: result.investmentId,
-      amount: result.amount,
-      rate: result.rate
+      message: 'Investissement créé avec succès',
+      investmentId: investment._id,
+      amount: verification.amount,
+      rate: opportunity.finalRate
     });
 
   } catch (error) {

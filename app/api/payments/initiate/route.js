@@ -4,13 +4,10 @@ import connectDB from '@/lib/db';
 import User from '@/models/User';
 import Opportunity from '@/models/Opportunity';
 import { verifyAuth } from '@/lib/auth';
-import { createPaymentPage, generateDepositId } from '@/lib/pawapay';
-
-// Modèle simple pour tracker les paiements en attente
 import mongoose from 'mongoose';
 
 const PendingPaymentSchema = new mongoose.Schema({
-  depositId: { type: String, required: true, unique: true },
+  transactionId: { type: String, required: true, unique: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   opportunityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Opportunity', required: true },
   amount: { type: Number, required: true },
@@ -19,8 +16,6 @@ const PendingPaymentSchema = new mongoose.Schema({
 });
 
 const PendingPayment = mongoose.models.PendingPayment || mongoose.model('PendingPayment', PendingPaymentSchema);
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://cashprofit.fr';
 
 export async function POST(request) {
   try {
@@ -69,41 +64,14 @@ export async function POST(request) {
       );
     }
 
-    // Générer depositId unique
-    const depositId = generateDepositId();
-
-    // Sauvegarder le paiement en attente AVANT d'appeler PawaPay
-    await PendingPayment.create({
-      depositId,
-      userId: user._id,
-      opportunityId: opportunity._id,
-      amount,
-    });
-
-    // Créer la Payment Page PawaPay
-    const result = await createPaymentPage({
-      depositId,
-      amount,
-      country: 'CIV', // Côte d'Ivoire
-      returnUrl: `${BASE_URL}/user/payment/return?depositId=${depositId}`,
-      reason: `Investissement ${opportunity.name} - ${amount.toLocaleString()} FCFA`,
-    });
-
-    if (!result.success) {
-      // Supprimer le pending payment si PawaPay échoue
-      await PendingPayment.deleteOne({ depositId });
-      return NextResponse.json(
-        { success: false, message: 'Erreur lors de la création du paiement' },
-        { status: 500 }
-      );
-    }
-
-    console.log(`💳 Payment initiated: ${depositId} - ${user.name} - ${amount} FCFA`);
+    console.log(`💳 KkiaPay payment initiated: ${user.name} - ${amount} FCFA - ${opportunity.name}`);
 
     return NextResponse.json({
       success: true,
-      paymentUrl: result.redirectUrl,
-      depositId,
+      message: 'Paiement prêt. Le widget KkiaPay va s\'ouvrir côté client.',
+      opportunityId: opportunity._id,
+      amount,
+      opportunityName: opportunity.name,
     });
 
   } catch (error) {

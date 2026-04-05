@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import mongoose from 'mongoose';
 import { verifyAuth } from '@/lib/auth';
-import { checkDepositStatus } from '@/lib/pawapay';
+import { verifyTransaction } from '@/lib/kkiapay';
 
 function getPendingPaymentModel() {
   const schema = new mongoose.Schema({
-    depositId: { type: String, required: true, unique: true },
+    transactionId: { type: String, required: true, unique: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     opportunityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Opportunity', required: true },
     amount: { type: Number, required: true },
@@ -25,17 +25,17 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const depositId = searchParams.get('depositId');
+    const transactionId = searchParams.get('transactionId');
 
-    if (!depositId) {
-      return NextResponse.json({ success: false, message: 'depositId manquant' }, { status: 400 });
+    if (!transactionId) {
+      return NextResponse.json({ success: false, message: 'transactionId manquant' }, { status: 400 });
     }
 
     await connectDB();
     const PendingPayment = getPendingPaymentModel();
 
     // Vérifier d'abord dans notre DB
-    const pending = await PendingPayment.findOne({ depositId, userId: payload.userId });
+    const pending = await PendingPayment.findOne({ transactionId, userId: payload.userId });
 
     if (!pending) {
       return NextResponse.json({ success: false, message: 'Paiement non trouvé' }, { status: 404 });
@@ -49,31 +49,33 @@ export async function GET(request) {
       return NextResponse.json({ success: true, status: 'failed' });
     }
 
-    // Sinon, vérifier chez PawaPay
+    // Sinon, vérifier chez KkiaPay
     try {
-      const result = await checkDepositStatus(depositId);
+      const result = await verifyTransaction(transactionId);
 
-      if (result.status === 'FOUND' && result.data) {
-        const pawaStatus = result.data.status;
+      if (result.success && result.data) {
+        const kkiaStatus = result.status; // 'SUCCESS', 'FAILED', 'PENDING'
 
-        if (pawaStatus === 'COMPLETED') {
-          return NextResponse.json({ success: true, status: 'completed' });
-        } else if (pawaStatus === 'FAILED') {
+        if (kkiaStatus === 'SUCCESS') {
+          pending.status = 'completed';
+          await pending.save();
+          return NextResponse.json({ success: true, status: 'completed', data: result.data });
+        } else if (kkiaStatus === 'FAILED') {
           pending.status = 'failed';
           await pending.save();
           return NextResponse.json({ success: true, status: 'failed' });
         } else {
-          // SUBMITTED, ACCEPTED, IN_RECONCILIATION
+          // PENDING
           return NextResponse.json({ success: true, status: 'pending' });
         }
       }
 
-      if (result.status === 'NOT_FOUND') {
-        // Le user n'a peut-être pas encore appuyé sur "Pay"
+      if (!result.success) {
+        console.error('KkiaPay verify error:', result.error);
         return NextResponse.json({ success: true, status: 'pending' });
       }
-    } catch (pawaError) {
-      console.error('PawaPay check error:', pawaError);
+    } catch (kkiaError) {
+      console.error('KkiaPay check error:', kkiaError);
     }
 
     return NextResponse.json({ success: true, status: 'pending' });

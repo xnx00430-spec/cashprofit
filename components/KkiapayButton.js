@@ -96,8 +96,8 @@ export default function KkiapayButton({
     if (typeof window !== 'undefined' && window.openKkiapayWidget) {
       window.openKkiapayWidget({
         amount: amount,
-        key: process.env.NEXT_PUBLIC_KKIAPAY_PUBLIC_KEY,
-        sandbox: process.env.NEXT_PUBLIC_KKIAPAY_SANDBOX === 'true',
+        key: process.env.KKIAPAY_PUBLIC_KEY,
+        sandbox: false,
         theme: '#f0b90b',
         name: customerName,
         email: customerEmail,

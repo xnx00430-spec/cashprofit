@@ -25,6 +25,9 @@ export async function GET(request) {
       );
     }
 
+    // ✅ VÉRIFIER SI BÉNÉFICES BLOQUÉS
+    const isBenefitsBlocked = user.benefitsBlocked === true;
+
     // Récupérer tous les investissements actifs
     const investments = await Investment.find({ 
       userId: user._id, 
@@ -40,15 +43,12 @@ export async function GET(request) {
       // Vérifier si investissement toujours actif
       if (!inv.isActive()) continue;
 
-      // Calculer le temps écoulé depuis le début
       const startTime = new Date(inv.startDate).getTime();
       const currentTime = now.getTime();
       const secondsPassed = (currentTime - startTime) / 1000;
 
-      // Récupérer le taux de base de l'opportunité
       const baseRate = inv.opportunityId?.rateLevel1 || inv.opportunityId?.rate || 10;
 
-      // Calculer le bonus selon le niveau de l'user
       let levelBonus = 0;
       if (user.level === 1) {
         levelBonus = 0;
@@ -58,35 +58,30 @@ export async function GET(request) {
         levelBonus = 10;
       }
 
-      // Taux final pour cet investissement
       const finalRate = baseRate + levelBonus;
       const rateDecimal = finalRate / 100;
 
-      // Gains par semaine pour cet investissement
       const weeklyGains = inv.amount * rateDecimal;
-
-      // Gains par seconde
       const gainsPerSecond = weeklyGains / (7 * 24 * 60 * 60);
 
-      // Calculer nombre de semaines complètes écoulées
       const weeksElapsed = Math.floor(secondsPassed / (7 * 24 * 60 * 60));
-
-      // Limiter au nombre maximum de semaines
       const activeWeeks = Math.min(weeksElapsed, inv.maxWeeks);
 
-      // Calculer les gains accumulés
-      // Gains des semaines complètes
       const completeWeeksGains = activeWeeks * weeklyGains;
 
-      // Gains de la semaine en cours (si pas terminé)
       let currentWeekGains = 0;
       if (activeWeeks < inv.maxWeeks) {
         const secondsInCurrentWeek = secondsPassed % (7 * 24 * 60 * 60);
         currentWeekGains = gainsPerSecond * secondsInCurrentWeek;
       }
 
-      // Total gains pour cet investissement
-      const investmentTotalGains = completeWeeksGains + currentWeekGains;
+      // ✅ SI BÉNÉFICES BLOQUÉS → RETOURNER SEULEMENT LES GAINS FIGÉS (lastSyncedEarnings)
+      let investmentTotalGains = completeWeeksGains + currentWeekGains;
+      
+      if (isBenefitsBlocked) {
+        // Gains figés au montant déjà synchronisé
+        investmentTotalGains = inv.lastSyncedEarnings || 0;
+      }
 
       totalGainsRealtime += investmentTotalGains;
 
@@ -100,7 +95,9 @@ export async function GET(request) {
         secondsPassed: Math.floor(secondsPassed),
         weeksElapsed: activeWeeks,
         maxWeeks: inv.maxWeeks,
-        gainsAccumulated: investmentTotalGains
+        gainsAccumulated: investmentTotalGains,
+        benefitsBlocked: isBenefitsBlocked,
+        lastSyncedEarnings: inv.lastSyncedEarnings || 0
       });
     }
 
@@ -108,6 +105,7 @@ export async function GET(request) {
       success: true,
       totalGains: totalGainsRealtime,
       userLevel: user.level,
+      benefitsBlocked: isBenefitsBlocked,
       activeInvestments: investments.length,
       investments: investmentsDetails,
       calculatedAt: now.toISOString()

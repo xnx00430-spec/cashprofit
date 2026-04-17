@@ -101,8 +101,14 @@ InvestmentSchema.methods.getCurrentRate = function(userLevel) {
   return this.baseRate + levelBonus;
 };
 
-// Calcul gains actuels (progressif, pas par semaines complètes)
-InvestmentSchema.methods.calculateCurrentGains = function(userLevel = null) {
+// ✅ CALCUL GAINS ACTUELS - AVEC VÉRIFICATION benefitsBlocked
+InvestmentSchema.methods.calculateCurrentGains = async function(userLevel = null, benefitsBlocked = false) {
+  // ✅ SI BÉNÉFICES BLOQUÉS → RETOURNER SEULEMENT LES GAINS DÉJÀ SYNCHRONISÉS
+  if (benefitsBlocked) {
+    return this.lastSyncedEarnings || 0;
+  }
+
+  // Sinon calcul normal
   const now = new Date();
   const msElapsed = now - this.startDate;
   const weeksElapsed = msElapsed / (7 * 24 * 60 * 60 * 1000);
@@ -114,6 +120,12 @@ InvestmentSchema.methods.calculateCurrentGains = function(userLevel = null) {
   return weeklyGain * activeWeeks;
 };
 
+// ✅ CALCUL GAINS AVEC BÉNÉFICES BLOQUÉS (utile pour les requêtes où on a pas le user)
+InvestmentSchema.methods.calculateCurrentGainsWithBlockedCheck = async function(user, userLevel = null) {
+  const benefitsBlocked = user?.benefitsBlocked === true;
+  return this.calculateCurrentGains(userLevel, benefitsBlocked);
+};
+
 // Vérifier si actif
 InvestmentSchema.methods.isActive = function() {
   if (this.status !== 'active') return false;
@@ -122,12 +134,14 @@ InvestmentSchema.methods.isActive = function() {
   return weeksElapsed < this.maxWeeks;
 };
 
-// Gains totaux d'un utilisateur
-InvestmentSchema.statics.calculateUserTotalGains = async function(userId) {
+// ✅ GAINS TOTAUX D'UN UTILISATEUR - AVEC VÉRIFICATION benefitsBlocked
+InvestmentSchema.statics.calculateUserTotalGains = async function(userId, benefitsBlocked = false) {
   const investments = await this.find({ userId, status: 'active' });
   let totalGains = 0;
   investments.forEach(inv => {
-    totalGains += inv.calculateCurrentGains();
+    // Si bloqué → retourner seulement lastSyncedEarnings
+    const gains = benefitsBlocked ? (inv.lastSyncedEarnings || 0) : inv.calculateCurrentGains();
+    totalGains += gains;
   });
   return totalGains;
 };

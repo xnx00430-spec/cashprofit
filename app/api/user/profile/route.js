@@ -5,24 +5,39 @@ import User from '@/models/User';
 import Investment from '@/models/Investment';
 import { verifyAuth } from '@/lib/auth';
 
-// Calculer les gains live d'un utilisateur depuis ses investissements
-function calculateUserLiveEarnings(investments) {
-  const now = new Date();
+// ✅ Calculer les gains live d'un utilisateur depuis ses investissements
+// SI BLOQUÉ → retourner SEULEMENT lastSyncedEarnings (figés, ce qu'il a généré avant)
+// SI OK → retourner gains en direct normal
+function calculateUserLiveEarnings(investments, benefitsBlocked = false) {
   let totalEarnings = 0;
+
   for (const inv of investments) {
-    const startDate = new Date(inv.startDate);
-    const maxWeeks = inv.maxWeeks || 52;
-    const msElapsed = now - startDate;
-    const weeksElapsed = msElapsed / (7 * 24 * 60 * 60 * 1000);
-    const activeWeeks = Math.min(Math.max(weeksElapsed, 0), maxWeeks);
-    const weeklyEarning = inv.amount * (inv.weeklyRate / 100);
-    totalEarnings += weeklyEarning * activeWeeks;
+    let investmentEarnings;
+
+    if (benefitsBlocked) {
+      // ✅ SI BLOQUÉ → retourner seulement ce qui a déjà été synchronisé (avant blocage)
+      investmentEarnings = inv.lastSyncedEarnings || 0;
+    } else {
+      // ✅ SI OK → calculer les gains en direct normal
+      const now = new Date();
+      const startDate = new Date(inv.startDate);
+      const maxWeeks = inv.maxWeeks || 52;
+      const msElapsed = now - startDate;
+      const weeksElapsed = msElapsed / (7 * 24 * 60 * 60 * 1000);
+      const activeWeeks = Math.min(Math.max(weeksElapsed, 0), maxWeeks);
+      const weeklyEarning = inv.amount * (inv.weeklyRate / 100);
+      investmentEarnings = weeklyEarning * activeWeeks;
+    }
+
+    totalEarnings += investmentEarnings;
   }
+
   return totalEarnings;
 }
 
 // Calculer les commissions live du parrain
 // = 10% × (bénéfices live + commissions live) de chaque filleul
+// ✅ CALCULE sur lastSyncedEarnings si filleul bloqué
 async function calculateLiveCommissions(userId) {
   const referrals = await User.find({ referredBy: userId }).lean();
   if (referrals.length === 0) return 0;
@@ -30,17 +45,22 @@ async function calculateLiveCommissions(userId) {
   let totalCommission = 0;
 
   for (const referral of referrals) {
+    // ✅ Pas de skip ! On calcule même si bloqué
+    // Mais sur les gains déjà générés (lastSyncedEarnings)
+
     // Bénéfices live du filleul (100% brut, avant prélèvement)
     const referralInvestments = await Investment.find({
       userId: referral._id,
       status: 'active'
     }).lean();
-    const referralEarnings = calculateUserLiveEarnings(referralInvestments);
+    
+    // ✅ Si bloqué → utiliser lastSyncedEarnings, sinon gains en direct
+    const referralEarnings = calculateUserLiveEarnings(referralInvestments, referral.benefitsBlocked);
 
     // Commissions live du filleul (ses propres filleuls)
     const referralCommissions = await calculateLiveCommissions(referral._id);
 
-    // 10% du total (bénéfices + commissions)
+    // 10% du total (bénéfices + commissions) - MÊME SI BLOQUÉ
     totalCommission += (referralEarnings + referralCommissions) * 0.10;
   }
 
@@ -68,7 +88,7 @@ export async function GET(request) {
       );
     }
 
-    // Commissions LIVE
+    // Commissions LIVE (calcul MÊME si filleul bloqué)
     const liveCommissions = await calculateLiveCommissions(user._id);
 
     return NextResponse.json({
@@ -86,7 +106,7 @@ export async function GET(request) {
         sponsorCode: user.sponsorCode,
         referredBy: user.referredBy,
         referredByCode: user.referredByCode,
-        hasReferrer: !!user.referredBy, // true si l'user a un parrain
+        hasReferrer: !!user.referredBy,
         balance: user.balance || 0,
         totalInvested: user.totalInvested || 0,
         totalEarnings: user.totalEarnings || 0,

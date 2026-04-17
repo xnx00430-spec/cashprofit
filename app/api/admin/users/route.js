@@ -109,7 +109,10 @@ export async function GET(request) {
         const referralCount = await User.countDocuments({ referredBy: user._id });
         const uid = user._id.toString();
         const hasReferrer = !!user.referredBy;
-        const liveEarnings = liveEarningsByUser[uid] || 0;
+        
+        // ✅ SI BLOQUÉ → liveEarnings = 0
+        let liveEarnings = user.benefitsBlocked ? 0 : (liveEarningsByUser[uid] || 0);
+        
         // Si le user a un parrain, ses gains nets = 90%
         const netLiveEarnings = hasReferrer ? liveEarnings * 0.90 : liveEarnings;
 
@@ -118,13 +121,19 @@ export async function GET(request) {
           referralCount,
           liveEarnings: Math.round(netLiveEarnings * 100) / 100,
           // Bénéfices totaux = balance (synced) + gains live non synced
-          totalBenefits: Math.round(((user.balance || 0) + netLiveEarnings) * 100) / 100
+          totalBenefits: Math.round(((user.balance || 0) + netLiveEarnings) * 100) / 100,
+          benefitsBlocked: user.benefitsBlocked // Ajouter le flag pour l'admin
         };
       })
     );
 
     // Calculer total des gains live pour les stats globales
-    const totalLiveEarnings = Object.values(liveEarningsByUser).reduce((sum, v) => sum + v, 0);
+    // ✅ EXCLURE les users bloqués
+    const totalLiveEarnings = users.reduce((sum, user) => {
+      const uid = user._id.toString();
+      const liveEarnings = user.benefitsBlocked ? 0 : (liveEarningsByUser[uid] || 0);
+      return sum + liveEarnings;
+    }, 0);
 
     return NextResponse.json({
       success: true,
@@ -152,6 +161,7 @@ export async function GET(request) {
         referralCount: u.referralCount,
         currentLevelCagnotte: u.currentLevelCagnotte,
         currentLevelTarget: u.currentLevelTarget,
+        benefitsBlocked: u.benefitsBlocked,
         createdAt: u.createdAt,
         lastLogin: u.lastLogin
       })),

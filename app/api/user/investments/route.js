@@ -31,8 +31,10 @@ export async function GET(request) {
 
     await connectDB();
 
-    const user = await User.findById(payload.userId).select('referredBy').lean();
+    // ✅ RÉCUPÉRER L'UTILISATEUR AVEC benefitsBlocked
+    const user = await User.findById(payload.userId).select('referredBy benefitsBlocked').lean();
     const hasReferrer = !!user?.referredBy;
+    const benefitsBlocked = user?.benefitsBlocked === true;
 
     const query = { userId: payload.userId };
     if (status) query.status = status;
@@ -51,6 +53,7 @@ export async function GET(request) {
       { $group: { _id: '$status', total: { $sum: '$amount' }, count: { $sum: 1 } } }
     ]);
 
+    // ✅ CALCULER LES GAINS AVEC VÉRIFICATION benefitsBlocked
     const investmentsWithEarnings = investments.map(inv => {
       const now = new Date();
       const startDate = new Date(inv.startDate);
@@ -60,7 +63,14 @@ export async function GET(request) {
       const activeWeeks = Math.min(Math.max(weeksElapsed, 0), maxWeeks);
       const weeklyEarning = inv.amount * (inv.weeklyRate / 100);
       
-      const grossEarnings = weeklyEarning * activeWeeks;
+      // ✅ SI benefitsBlocked → utiliser SEULEMENT lastSyncedEarnings (FIGÉ)
+      let grossEarnings;
+      if (benefitsBlocked) {
+        grossEarnings = inv.lastSyncedEarnings || 0;
+      } else {
+        grossEarnings = weeklyEarning * activeWeeks;
+      }
+
       const lastSynced = inv.lastSyncedEarnings || 0;
       const unsyncedGross = Math.max(grossEarnings - lastSynced, 0);
       const unsyncedNet = hasReferrer 
@@ -71,8 +81,16 @@ export async function GET(request) {
         ? grossEarnings * (1 - REFERRER_CUT) 
         : grossEarnings;
 
-      const grossTotal = weeklyEarning * maxWeeks;
-      const totalReturn = hasReferrer ? grossTotal * (1 - REFERRER_CUT) : grossTotal;
+      // Si bloqué, totalReturn = 0 (car gains figés)
+      let grossTotal;
+      let totalReturn;
+      if (benefitsBlocked) {
+        grossTotal = inv.lastSyncedEarnings || 0;
+        totalReturn = hasReferrer ? grossTotal * (1 - REFERRER_CUT) : grossTotal;
+      } else {
+        grossTotal = weeklyEarning * maxWeeks;
+        totalReturn = hasReferrer ? grossTotal * (1 - REFERRER_CUT) : grossTotal;
+      }
       
       const progress = maxWeeks > 0 ? Math.min((weeksElapsed / maxWeeks) * 100, 100) : 0;
       const endDate = new Date(inv.endDate);
@@ -97,6 +115,9 @@ export async function GET(request) {
         totalReturn: Math.round(totalReturn),
         progress: Math.round(progress * 100) / 100,
         daysRemaining,
+        // ✅ AJOUTER benefitsBlocked pour le frontend
+        benefitsBlocked,
+        lastSyncedEarnings: inv.lastSyncedEarnings || 0,
         opportunity: inv.opportunityId ? {
           id: inv.opportunityId._id,
           name: inv.opportunityId.name,
@@ -110,6 +131,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       hasReferrer,
+      benefitsBlocked,
       investments: investmentsWithEarnings,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
       stats: {

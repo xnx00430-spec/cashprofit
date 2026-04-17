@@ -49,8 +49,7 @@ function Modal({ show, type, title, message, onClose, onConfirm, confirmText, ca
   );
 }
 
-// Taux de conversion FCFA → USDT (approximatif, à ajuster)
-const FCFA_TO_USDT_RATE = 600; // 1 USDT ≈ 600 FCFA
+const FCFA_TO_USDT_RATE = 600;
 
 export default function PortefeuillePage() {
   const router = useRouter();
@@ -62,6 +61,8 @@ export default function PortefeuillePage() {
   const [balances, setBalances] = useState(null);
   const [investments, setInvestments] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [realTimeGains, setRealTimeGains] = useState(0);
+  const [benefitsBlocked, setBenefitsBlocked] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawType, setWithdrawType] = useState(null);
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -71,10 +72,8 @@ export default function PortefeuillePage() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, confirmText: '', cancelText: '' });
 
-  // Crypto-specific fields
   const [cryptoNetwork, setCryptoNetwork] = useState('TRC20');
   const [cryptoAddress, setCryptoAddress] = useState('');
-  const [addressCopied, setAddressCopied] = useState(false);
 
   const showModalFn = (type, title, message, opts = {}) => setModal({ show: true, type, title, message, ...opts });
   const hideModal = () => setModal({ ...modal, show: false, onConfirm: null });
@@ -84,8 +83,16 @@ export default function PortefeuillePage() {
   useEffect(() => {
     setMounted(true);
     fetchAllData();
-    const interval = setInterval(fetchAllData, 5000);
-    return () => clearInterval(interval);
+    
+    // Fetch gains realtime toutes les secondes
+    const gainsInterval = setInterval(fetchRealTimeGains, 1000);
+    // Fetch autres données toutes les 5 secondes
+    const dataInterval = setInterval(fetchAllData, 5000);
+    
+    return () => {
+      clearInterval(gainsInterval);
+      clearInterval(dataInterval);
+    };
   }, []);
 
   const fetchAllData = async () => {
@@ -99,6 +106,7 @@ export default function PortefeuillePage() {
       if (userData.success) {
         setUser(userData.user);
         setHasReferrer(userData.user.hasReferrer || false);
+        setBenefitsBlocked(userData.user.benefitsBlocked || false);
         setBalances({
           benefices: userData.user.balance || 0,
           commissions: userData.user.totalCommissions || 0,
@@ -117,7 +125,20 @@ export default function PortefeuillePage() {
     }
   };
 
-  const getLiveEarnings = () => investments.reduce((sum, inv) => sum + (inv.currentEarnings || 0), 0);
+  const fetchRealTimeGains = async () => {
+    try {
+      const res = await fetch('/api/user/gains-realtime');
+      const data = await res.json();
+      if (data.success) {
+        setRealTimeGains(data.totalGains);
+        setBenefitsBlocked(data.benefitsBlocked);
+      }
+    } catch (error) {
+      console.error('Erreur fetch gains realtime:', error);
+    }
+  };
+
+  const getLiveEarnings = () => realTimeGains;
   const getUnsyncedEarnings = () => investments.reduce((sum, inv) => sum + (inv.unsyncedEarnings || 0), 0);
   const getTotalBenefices = () => (balances?.benefices || 0) + getUnsyncedEarnings();
 
@@ -131,7 +152,6 @@ export default function PortefeuillePage() {
     return (parseFloat(withdrawAmount) / FCFA_TO_USDT_RATE).toFixed(2);
   };
 
-  // Validation basique d'une adresse crypto
   const isValidCryptoAddress = (address, network) => {
     if (!address || address.length < 20) return false;
     if (network === 'TRC20' && !address.startsWith('T')) return false;
@@ -147,7 +167,6 @@ export default function PortefeuillePage() {
       return;
     }
 
-    // Validation crypto
     if (isCrypto) {
       if (!cryptoAddress) {
         showModalFn('error', 'Adresse manquante', 'Entrez votre adresse de wallet USDT');
@@ -189,7 +208,6 @@ export default function PortefeuillePage() {
         accountName: isCrypto ? `Wallet ${cryptoNetwork}` : accountName,
       };
 
-      // Ajouter les champs crypto
       if (isCrypto) {
         body.cryptoNetwork = cryptoNetwork;
         body.cryptoAddress = cryptoAddress;
@@ -350,7 +368,7 @@ export default function PortefeuillePage() {
               </div>
               <div className="flex-1">
                 <h3 className="text-red-700 font-bold mb-1">Vos gains sont bloqués</h3>
-                <p className="text-red-600/80 text-sm mb-3">Vous n&apos;avez pas atteint votre objectif dans les délais. Invitez des personnes à investir pour débloquer vos gains. Vos commissions et bonus restent accessibles.</p>
+                <p className="text-red-600/80 text-sm mb-3">Vous n&apos;avez pas atteint votre objectif dans les délais. Les nouveaux gains ne sont plus générés. Vous pouvez retirer ce que vous aviez déjà généré avant le blocage. Invitez des personnes à investir pour débloquer vos gains. Vos commissions et bonus restent accessibles.</p>
                 <Link href="/user/reseau" className="inline-block bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm">Inviter des proches</Link>
               </div>
             </div>
@@ -380,7 +398,8 @@ export default function PortefeuillePage() {
               </div>
             </div>
 
-            {showBalances && liveEarnings > 0 && (
+            {/* ✅ GAINS EN DIRECT - SEULEMENT SI PAS BLOQUÉS */}
+            {showBalances && liveEarnings > 0 && !benefitsBlocked && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
@@ -390,12 +409,23 @@ export default function PortefeuillePage() {
                   +{liveEarnings.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F
                 </div>
                 <div className="text-green-600/60 text-[10px] mt-1">Total gagné depuis le début (augmente chaque seconde)</div>
-                {liveEarnings > totalBenefices && (
-                  <div className="text-gray-500 text-[10px] mt-1">Vous avez déjà retiré {(liveEarnings - totalBenefices).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F</div>
-                )}
                 {hasReferrer && (
                   <div className="text-orange-500 text-[10px] mt-1">Net après 10% pour votre parrain</div>
                 )}
+              </div>
+            )}
+
+            {/* ✅ ALERTE SI BLOQUÉS - GAINS FIGÉS */}
+            {showBalances && benefitsBlocked && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertCircle className="text-orange-500" size={14} />
+                  <span className="text-orange-600 text-xs font-medium">Bénéfices</span>
+                </div>
+                <div className="text-orange-700 text-sm font-bold">
+                  {totalBenefices.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} F retirable
+                </div>
+                <div className="text-orange-600/80 text-[10px] mt-1">Ce que vous aviez généré avant le blocage. Les nouveaux gains ne sont plus comptabilisés.</div>
               </div>
             )}
 
@@ -416,14 +446,14 @@ export default function PortefeuillePage() {
 
             <button
               onClick={() => openWithdrawModal('gains')}
-              disabled={user?.benefitsBlocked || totalBenefices < 1000}
+              disabled={totalBenefices < 1000}
               className={`w-full py-3 rounded-xl font-semibold transition-colors text-sm ${
-                user?.benefitsBlocked || totalBenefices < 1000
+                totalBenefices < 1000
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-gray-900 text-white hover:bg-gray-800 shadow-md'
               }`}
             >
-              {user?.benefitsBlocked ? 'Bloqué — Invitez pour débloquer' : totalBenefices >= 1000 ? `Retirer mes bénéfices` : 'Retirer'}
+              {totalBenefices >= 1000 ? 'Retirer mes bénéfices' : 'Retirer'}
             </button>
           </div>
 
@@ -717,7 +747,6 @@ export default function PortefeuillePage() {
                 {/* ==================== CHAMPS CRYPTO ==================== */}
                 {isCrypto && (
                   <>
-                    {/* Estimation USDT */}
                     {withdrawAmount && parseFloat(withdrawAmount) > 0 && (
                       <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                         <div className="flex items-center justify-between">
@@ -730,14 +759,13 @@ export default function PortefeuillePage() {
                       </div>
                     )}
 
-                    {/* Réseau */}
                     <div>
                       <label className="text-gray-700 text-sm font-medium mb-1.5 block">Réseau USDT</label>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { value: 'TRC20', label: 'TRC20', desc: 'Tron', color: 'red' },
-                          { value: 'BEP20', label: 'BEP20', desc: 'BSC', color: 'yellow' },
-                          { value: 'ERC20', label: 'ERC20', desc: 'Ethereum', color: 'blue' },
+                          { value: 'TRC20', label: 'TRC20', desc: 'Tron' },
+                          { value: 'BEP20', label: 'BEP20', desc: 'BSC' },
+                          { value: 'ERC20', label: 'ERC20', desc: 'Ethereum' },
                         ].map((net) => (
                           <button
                             key={net.value}
@@ -762,7 +790,6 @@ export default function PortefeuillePage() {
                       </div>
                     </div>
 
-                    {/* Adresse wallet */}
                     <div>
                       <label className="text-gray-700 text-sm font-medium mb-1.5 block">Votre adresse de wallet USDT ({cryptoNetwork})</label>
                       <input
@@ -784,7 +811,6 @@ export default function PortefeuillePage() {
                   </>
                 )}
 
-                {/* ==================== CHAMPS MOBILE MONEY / BANK ==================== */}
                 {!isCrypto && (
                   <>
                     <div>
@@ -813,7 +839,6 @@ export default function PortefeuillePage() {
                   </>
                 )}
 
-                {/* Info délai */}
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                   <div className="text-gray-600 text-xs">
                     {isCrypto 
@@ -823,7 +848,6 @@ export default function PortefeuillePage() {
                   </div>
                 </div>
 
-                {/* Boutons */}
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowWithdrawModal(false)}

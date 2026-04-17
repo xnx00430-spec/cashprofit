@@ -3,6 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "imports": {
+    "@/lib/*": "./lib/*",
+    "@/models/*": "./models/*"
+  },
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
@@ -10,7 +14,8 @@
     "create-admin": "node scripts/create-admin.js",
     "calculate-gains": "node scripts/calculate-weekly-gains.js",
     "seed-opportunities": "node scripts/seed-opportunities.js",
-    "check-levels": "node scripts/check-level-progression.js"
+    "check-levels": "node scripts/check-level-progression.js",
+    "check-blocked": "node scripts/check-blocked-users.js"
   },
   "dependencies": {
     "@kkiapay-org/nodejs-sdk": "^1.0.7",

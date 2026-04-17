@@ -1,4 +1,5 @@
-// app/api/user/withdraw/route.js
+// app/api/user/withdraw/route.js - CORRIGÉ
+// ✅ Permet le retrait des gains générés AVANT le blocage
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
@@ -267,22 +268,9 @@ export async function POST(request) {
       }, { status: 403 });
     }
 
-    // ==================== VÉRIFICATION BLOCAGE BÉNÉFICES ====================
-    if (type === 'gains' && user.benefitsBlocked) {
-      return NextResponse.json({
-        success: false,
-        blocked: true,
-        message: 'Vos bénéfices personnels sont bloqués car vous n\'avez pas atteint votre défi de niveau',
-        details: {
-          level: user.level,
-          target: user.currentLevelTarget,
-          current: user.currentLevelCagnotte,
-          missing: user.currentLevelTarget - user.currentLevelCagnotte,
-          commissionsAvailable: user.totalCommissions,
-          bonusAvailable: user.bonusParrainage
-        }
-      }, { status: 403 });
-    }
+    // ==================== NE PAS VÉRIFIER benefitsBlocked ====================
+    // ✅ L'utilisateur bloqué PEUT retirer ce qu'il a gagné avant le blocage
+    // Les gains générés AVANT le blocage restent accessibles au retrait
 
     // ==================== SYNC GAINS EN DB AVANT RETRAIT ====================
     if (type === 'gains') {
